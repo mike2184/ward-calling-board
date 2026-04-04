@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { CallingList } from "@/components/board/CallingList";
+import { BoardView } from "@/components/board/BoardView";
 import { MemberSidebar } from "@/components/members/MemberSidebar";
 import { OrganizationFilter } from "@/components/filters/OrganizationFilter";
 import { ImportWizard } from "@/components/import/ImportWizard";
@@ -7,12 +8,15 @@ import { seedDefaultData, clearAllData } from "@/data/import-service";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/data/db";
 
+type ViewMode = "list" | "board";
+
 function App() {
   const [showImport, setShowImport] = useState(false);
   const [selectedOrg, setSelectedOrg] = useState<string | null>(null);
   const [showVacantOnly, setShowVacantOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("board");
 
   const memberCount = useLiveQuery(() => db.members.count());
   const callingCount = useLiveQuery(() => db.callings.count());
@@ -43,6 +47,29 @@ function App() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex rounded-md border overflow-hidden">
+            <button
+              onClick={() => setViewMode("board")}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                viewMode === "board"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              Board
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors border-l ${
+                viewMode === "list"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              List
+            </button>
+          </div>
           <button
             onClick={() => setShowResetConfirm(true)}
             className="px-3 py-1.5 text-sm font-medium rounded-md border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -71,19 +98,24 @@ function App() {
       </div>
 
       {/* Main content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Calling list */}
-        <main className="flex-1 min-w-0 overflow-auto p-6">
-          <CallingList
-            organizationFilter={selectedOrg}
-            showVacantOnly={showVacantOnly}
-            searchQuery={searchQuery}
-          />
-        </main>
-
-        {/* Member sidebar */}
-        <MemberSidebar />
-      </div>
+      {viewMode === "board" ? (
+        <BoardView
+          organizationFilter={selectedOrg}
+          showVacantOnly={showVacantOnly}
+          searchQuery={searchQuery}
+        />
+      ) : (
+        <div className="flex flex-1 overflow-hidden">
+          <main className="flex-1 min-w-0 overflow-auto p-6">
+            <CallingList
+              organizationFilter={selectedOrg}
+              showVacantOnly={showVacantOnly}
+              searchQuery={searchQuery}
+            />
+          </main>
+          <MemberSidebar isBoardView={false} />
+        </div>
+      )}
 
       {/* Import modal */}
       {showImport && (

@@ -4,8 +4,13 @@ import {
   useMembersWithCallingInfo,
 } from "@/hooks/useMembers";
 import { useState } from "react";
+import { DraggableMemberCard } from "./DraggableMemberCard";
 
-export function MemberSidebar() {
+interface Props {
+  isBoardView: boolean;
+}
+
+export function MemberSidebar({ isBoardView }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedSection, setExpandedSection] = useState<string | null>(
     "unassigned"
@@ -29,6 +34,11 @@ export function MemberSidebar() {
     <div className="w-64 flex-shrink-0 border-l bg-muted/20 flex flex-col h-full overflow-hidden">
       <div className="px-4 py-3 border-b">
         <h3 className="font-semibold text-sm">Members</h3>
+        {isBoardView && (
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Drag onto vacant slots
+          </p>
+        )}
       </div>
 
       <div className="flex-1 overflow-auto">
@@ -47,11 +57,15 @@ export function MemberSidebar() {
             </span>
           </button>
           {expandedSection === "unassigned" && unassigned && (
-            <div className="px-4 pb-2 space-y-0.5">
+            <div className="px-2 pb-2 space-y-0.5">
               {unassigned.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-2 italic">
+                <p className="text-xs text-muted-foreground py-2 px-2 italic">
                   All members have callings
                 </p>
+              ) : isBoardView ? (
+                unassigned.map((m) => (
+                  <DraggableMemberCard key={m.id} member={m} />
+                ))
               ) : (
                 unassigned.map((m) => (
                   <div
@@ -81,9 +95,9 @@ export function MemberSidebar() {
             </span>
           </button>
           {expandedSection === "multi" && multiCalling && (
-            <div className="px-4 pb-2 space-y-0.5">
+            <div className="px-2 pb-2 space-y-0.5">
               {multiCalling.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-2 italic">
+                <p className="text-xs text-muted-foreground py-2 px-2 italic">
                   No members with multiple callings
                 </p>
               ) : (
@@ -120,7 +134,7 @@ export function MemberSidebar() {
             </span>
           </button>
           {expandedSection === "all" && (
-            <div className="px-4 pb-2">
+            <div className="px-2 pb-2">
               <input
                 type="text"
                 placeholder="Search members..."
@@ -129,21 +143,35 @@ export function MemberSidebar() {
                 className="w-full px-2 py-1 text-sm border rounded mb-2 bg-background focus:outline-none focus:ring-1 focus:ring-ring"
               />
               <div className="space-y-0.5 max-h-60 overflow-auto">
-                {filteredMembers?.map((m) => (
-                  <div
-                    key={m.id}
-                    className="text-sm py-1 px-2 rounded hover:bg-muted/50 flex items-center justify-between"
-                  >
-                    <span>{m.fullName}</span>
-                    {m.callingCount > 0 && (
-                      <span className="text-xs text-muted-foreground">
-                        {m.callingCount === 1
+                {filteredMembers?.map((m) =>
+                  isBoardView ? (
+                    <DraggableMemberCard
+                      key={m.id}
+                      member={m}
+                      callingInfo={
+                        m.callingCount === 1
                           ? m.callingNames[0]
-                          : `${m.callingCount} callings`}
-                      </span>
-                    )}
-                  </div>
-                ))}
+                          : m.callingCount > 1
+                            ? `${m.callingCount} callings`
+                            : undefined
+                      }
+                    />
+                  ) : (
+                    <div
+                      key={m.id}
+                      className="text-sm py-1 px-2 rounded hover:bg-muted/50 flex items-center justify-between"
+                    >
+                      <span>{m.fullName}</span>
+                      {m.callingCount > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          {m.callingCount === 1
+                            ? m.callingNames[0]
+                            : `${m.callingCount} callings`}
+                        </span>
+                      )}
+                    </div>
+                  )
+                )}
               </div>
             </div>
           )}

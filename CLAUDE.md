@@ -28,7 +28,11 @@ src/
     useMembers.ts          — Member queries (unassigned, multi-calling, etc.)
   components/
     board/CallingList.tsx   — Table view of callings grouped by organization
+    board/BoardView.tsx    — Kanban board with DndContext wrapping board + sidebar
+    board/CallingCard.tsx  — Draggable calling card with status colors
+    board/OrganizationColumn.tsx — Droppable organization column with vacant slots
     members/MemberSidebar.tsx — Sidebar showing unassigned/multi-calling members
+    members/DraggableMemberCard.tsx — Draggable member card for board view
     filters/OrganizationFilter.tsx — Org filter pills + search + vacant toggle
     import/ImportWizard.tsx — Multi-step import dialog (LCR JSON + CSV tabs)
   utils/time.ts            — Serving duration formatting
@@ -63,12 +67,16 @@ src/
 - Summary stats (total, filled, vacant)
 - Reset data functionality
 
-### Phase 2 — Drag-and-Drop Board & Member Management
-- [ ] Kanban-style board view (org columns, calling cards)
-- [ ] Vacant position drop targets
-- [ ] Drag members from sidebar to vacant slots
-- [ ] Drag callings between positions
-- [ ] Color-coded calling cards (green/red/yellow borders)
+### Phase 2 — Drag-and-Drop Board & Member Management ✅
+- Kanban-style board view with organization columns and calling cards
+- Board/List view toggle in header
+- CallingCard component with green (filled) / red dashed (vacant) borders and serving duration
+- OrganizationColumn with filled/total count header
+- Vacant position drop targets that highlight on drag-over
+- Draggable member cards in sidebar (drag onto vacant slots to assign)
+- Draggable filled calling cards (move between positions)
+- DndContext wrapping both board and sidebar for cross-component drag-and-drop
+- BoardView component orchestrating dnd-kit sensors, collision detection, and drag handlers
 
 ### Phase 3 — Proposed Changes Workflow
 - [ ] ProposedChange records from drag-and-drop actions
