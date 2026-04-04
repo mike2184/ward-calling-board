@@ -26,6 +26,7 @@ src/
   hooks/
     useCallings.ts         — Calling queries with org/position/member joins
     useMembers.ts          — Member queries (unassigned, multi-calling, etc.)
+    useProposals.ts        — Proposed change CRUD, workflow transitions, apply logic
   components/
     board/CallingList.tsx   — Table view of callings grouped by organization
     board/BoardView.tsx    — Kanban board with DndContext wrapping board + sidebar
@@ -35,6 +36,7 @@ src/
     members/DraggableMemberCard.tsx — Draggable member card for board view
     filters/OrganizationFilter.tsx — Org filter pills + search + vacant toggle
     import/ImportWizard.tsx — Multi-step import dialog (LCR JSON + CSV tabs)
+    changes/ProposedChangesList.tsx — Changes drawer with proposal cards and sustaining report
   utils/time.ts            — Serving duration formatting
   lib/utils.ts             — Tailwind merge utility (cn)
 ```
@@ -78,11 +80,17 @@ src/
 - DndContext wrapping both board and sidebar for cross-component drag-and-drop
 - BoardView component orchestrating dnd-kit sensors, collision detection, and drag handlers
 
-### Phase 3 — Proposed Changes Workflow
-- [ ] ProposedChange records from drag-and-drop actions
-- [ ] Changes panel/drawer with diff view
-- [ ] Workflow: Draft → Pending Approval → Approved → Applied
-- [ ] Sustaining report printing
+### Phase 3 — Proposed Changes Workflow ✅
+- Drag-and-drop now creates ProposedChange records instead of direct updates
+- Changes drawer (slides in from right) showing all pending proposals
+- Proposal cards with status badges (Draft/Pending Approval/Approved)
+- Workflow: Draft → Submit for Approval → Approve → Apply Now
+- Apply All Approved batch action
+- Sustaining Report view (releases and new callings, grouped by org)
+- Print Report button for sustaining meetings
+- Delete/remove individual proposals
+- Changes badge with count in header
+- useProposals hook with full CRUD and workflow state transitions
 
 ### Phase 4 — Polish & Advanced Features
 - [ ] PDF import parser

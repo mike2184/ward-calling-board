@@ -18,7 +18,10 @@ import {
   useCallings,
   type CallingWithDetails,
 } from "@/hooks/useCallings";
-import { db } from "@/data/db";
+import {
+  createAssignProposal,
+  createMoveProposal,
+} from "@/hooks/useProposals";
 import type { Member } from "@/types/models";
 
 interface Props {
@@ -99,7 +102,7 @@ export function BoardView({
 
     const overData = over.data.current;
 
-    // Member dropped on vacant slot
+    // Member dropped on vacant slot → propose assignment
     if (
       active.data.current?.type === "member" &&
       overData?.type === "vacant-slot"
@@ -107,15 +110,14 @@ export function BoardView({
       const member: Member = active.data.current.member;
       const targetCalling: CallingWithDetails = overData.calling;
 
-      await db.callings.update(targetCalling.calling.id, {
-        memberId: member.id,
-        activeDate: new Date().toISOString().split("T")[0],
-        status: "active",
-        setApart: false,
-      });
+      await createAssignProposal(
+        targetCalling.calling.id,
+        member.id,
+        targetCalling.calling.memberId
+      );
     }
 
-    // Calling card dropped on vacant slot (move)
+    // Calling card dropped on vacant slot → propose move
     if (
       active.data.current?.type === "calling" &&
       overData?.type === "vacant-slot"
@@ -124,21 +126,13 @@ export function BoardView({
       const targetCalling: CallingWithDetails = overData.calling;
 
       if (sourceCalling.calling.id === targetCalling.calling.id) return;
+      if (!sourceCalling.calling.memberId) return;
 
-      await db.transaction("rw", db.callings, async () => {
-        await db.callings.update(targetCalling.calling.id, {
-          memberId: sourceCalling.calling.memberId,
-          activeDate: new Date().toISOString().split("T")[0],
-          status: "active",
-          setApart: false,
-        });
-        await db.callings.update(sourceCalling.calling.id, {
-          memberId: null,
-          activeDate: null,
-          status: "vacant",
-          setApart: false,
-        });
-      });
+      await createMoveProposal(
+        sourceCalling.calling.id,
+        targetCalling.calling.id,
+        sourceCalling.calling.memberId
+      );
     }
   }
 

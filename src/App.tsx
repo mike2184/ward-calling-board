@@ -4,7 +4,9 @@ import { BoardView } from "@/components/board/BoardView";
 import { MemberSidebar } from "@/components/members/MemberSidebar";
 import { OrganizationFilter } from "@/components/filters/OrganizationFilter";
 import { ImportWizard } from "@/components/import/ImportWizard";
+import { ProposedChangesList } from "@/components/changes/ProposedChangesList";
 import { seedDefaultData, clearAllData } from "@/data/import-service";
+import { useProposalCount } from "@/hooks/useProposals";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/data/db";
 
@@ -12,6 +14,7 @@ type ViewMode = "list" | "board";
 
 function App() {
   const [showImport, setShowImport] = useState(false);
+  const [showChanges, setShowChanges] = useState(false);
   const [selectedOrg, setSelectedOrg] = useState<string | null>(null);
   const [showVacantOnly, setShowVacantOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -20,6 +23,7 @@ function App() {
 
   const memberCount = useLiveQuery(() => db.members.count());
   const callingCount = useLiveQuery(() => db.callings.count());
+  const proposalCount = useProposalCount();
 
   // Seed default data on first load
   useEffect(() => {
@@ -70,6 +74,20 @@ function App() {
               List
             </button>
           </div>
+
+          {/* Changes button with badge */}
+          <button
+            onClick={() => setShowChanges(true)}
+            className="relative px-3 py-1.5 text-sm font-medium rounded-md border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            Changes
+            {(proposalCount ?? 0) > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                {proposalCount}
+              </span>
+            )}
+          </button>
+
           <button
             onClick={() => setShowResetConfirm(true)}
             className="px-3 py-1.5 text-sm font-medium rounded-md border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -120,6 +138,11 @@ function App() {
       {/* Import modal */}
       {showImport && (
         <ImportWizard onClose={() => setShowImport(false)} />
+      )}
+
+      {/* Changes drawer */}
+      {showChanges && (
+        <ProposedChangesList onClose={() => setShowChanges(false)} />
       )}
 
       {/* Reset confirmation modal */}
