@@ -1,7 +1,9 @@
 import {
   useProposals,
   advanceProposal,
+  rewindProposal,
   applyProposal,
+  revertProposal,
   applyAllApproved,
   deleteProposal,
   type ProposalWithDetails,
@@ -16,12 +18,14 @@ const STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
   pending_approval: "Pending Approval",
   approved: "Approved",
+  applied: "Applied",
 };
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
   pending_approval: "bg-warning/15 text-warning",
   approved: "bg-success/15 text-success",
+  applied: "bg-primary/15 text-primary",
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -38,6 +42,12 @@ function nextActionLabel(status: string): string | null {
   return null;
 }
 
+function prevActionLabel(status: string): string | null {
+  if (status === "pending_approval") return "Back to Draft";
+  if (status === "approved") return "Unapprove";
+  return null;
+}
+
 function ProposalCard({
   proposal,
 }: {
@@ -51,9 +61,21 @@ function ProposalCard({
     setLoading(false);
   };
 
+  const handleRewind = async () => {
+    setLoading(true);
+    await rewindProposal(proposal.id);
+    setLoading(false);
+  };
+
   const handleApply = async () => {
     setLoading(true);
     await applyProposal(proposal.id);
+    setLoading(false);
+  };
+
+  const handleRevert = async () => {
+    setLoading(true);
+    await revertProposal(proposal.id);
     setLoading(false);
   };
 
@@ -125,7 +147,16 @@ function ProposalCard({
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex items-center gap-2 pt-1 flex-wrap">
+        {prevActionLabel(proposal.status) && (
+          <button
+            onClick={handleRewind}
+            disabled={loading}
+            className="text-xs px-2.5 py-1 rounded border font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            {prevActionLabel(proposal.status)}
+          </button>
+        )}
         {nextActionLabel(proposal.status) && (
           <button
             onClick={handleAdvance}
@@ -142,6 +173,15 @@ function ProposalCard({
             className="text-xs px-2.5 py-1 rounded bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
             Apply Now
+          </button>
+        )}
+        {proposal.status === "applied" && (
+          <button
+            onClick={handleRevert}
+            disabled={loading}
+            className="text-xs px-2.5 py-1 rounded bg-destructive text-destructive-foreground font-medium hover:bg-destructive/90 transition-colors disabled:opacity-50"
+          >
+            Undo
           </button>
         )}
       </div>

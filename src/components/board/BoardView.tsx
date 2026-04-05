@@ -20,9 +20,24 @@ import {
 } from "@/hooks/useCallings";
 import {
   createAssignProposal,
+  createReleaseProposal,
   createMoveProposal,
+  useProposalsByCallingId,
+  type CallingProposal,
 } from "@/hooks/useProposals";
 import type { Member } from "@/types/models";
+
+interface PendingDrop {
+  memberId: string;
+  memberName: string;
+  targetCallingId: string;
+  targetPositionName: string;
+  sourceCallingId?: string;
+  sourcePositionName?: string;
+  /** The member currently in the target slot, if replacing */
+  replacingMemberId?: string;
+  replacingMemberName?: string;
+}
 
 interface Props {
   organizationFilter: string | null;
@@ -40,8 +55,10 @@ export function BoardView({
   searchQuery,
 }: Props) {
   const callings = useCallings(organizationFilter ?? undefined);
+  const proposalMap = useProposalsByCallingId();
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [activeDropId, setActiveDropId] = useState<string | null>(null);
+  const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -86,8 +103,27 @@ export function BoardView({
 
   function handleDragOver(event: DragOverEvent) {
     const overId = event.over?.id?.toString();
+    const overData = event.over?.data.current;
     if (overId?.startsWith("vacant-")) {
       setActiveDropId(overId.replace("vacant-", ""));
+    } else if (overId?.startsWith("filled-")) {
+      // Don't highlight if dragging onto yourself
+      const targetId = overId.replace("filled-", "");
+      const activeData = event.active.data.current;
+      if (activeData?.type === "calling" && activeData.calling.calling.id === targetId) {
+        setActiveDropId(null);
+      } else {
+        setActiveDropId(targetId);
+      }
+    } else if (overData?.type === "calling") {
+      // Sortable node hit directly — treat as filled slot
+      const targetId = overData.calling.calling.id;
+      const activeData = event.active.data.current;
+      if (activeData?.type === "calling" && activeData.calling.calling.id === targetId) {
+        setActiveDropId(null);
+      } else {
+        setActiveDropId(targetId);
+      }
     } else {
       setActiveDropId(null);
     }
@@ -101,39 +137,88 @@ export function BoardView({
     if (!over) return;
 
     const overData = over.data.current;
+    const activeData = active.data.current;
+    const isVacantTarget = overData?.type === "vacant-slot";
+    const isFilledTarget = overData?.type === "filled-slot" || overData?.type === "calling";
 
-    // Member dropped on vacant slot → propose assignment
-    if (
-      active.data.current?.type === "member" &&
-      overData?.type === "vacant-slot"
-    ) {
-      const member: Member = active.data.current.member;
-      const targetCalling: CallingWithDetails = overData.calling;
+    if (!isVacantTarget && !isFilledTarget) return;
 
+    const targetCalling: CallingWithDetails = overData!.calling;
+
+    const targetProposals = proposalMap?.get(targetCalling.calling.id);
+    const hasReleaseProposal = targetProposals?.some((p) => p.type === "release") ?? false;
+
+    // Member from sidebar dropped onto a slot
+    if (activeData?.type === "member") {
+      const member: Member = activeData.member;
+
+      if (isFilledTarget && !hasReleaseProposal) {
+        // Dropping onto a filled slot without existing release: propose release + assign
+        await createReleaseProposal(
+          targetCalling.calling.id,
+          targetCalling.calling.memberId!
+        );
+      }
+      // If there's already a release proposal, just add the assign
       await createAssignProposal(
         targetCalling.calling.id,
         member.id,
-        targetCalling.calling.memberId
+        null
       );
+      return;
     }
 
-    // Calling card dropped on vacant slot → propose move
-    if (
-      active.data.current?.type === "calling" &&
-      overData?.type === "vacant-slot"
-    ) {
-      const sourceCalling: CallingWithDetails = active.data.current.calling;
-      const targetCalling: CallingWithDetails = overData.calling;
-
+    // Calling card dragged onto a slot
+    if (activeData?.type === "calling") {
+      const sourceCalling: CallingWithDetails = activeData.calling;
       if (sourceCalling.calling.id === targetCalling.calling.id) return;
       if (!sourceCalling.calling.memberId) return;
 
-      await createMoveProposal(
-        sourceCalling.calling.id,
-        targetCalling.calling.id,
-        sourceCalling.calling.memberId
+      const drop: PendingDrop = {
+        memberId: sourceCalling.calling.memberId,
+        memberName: sourceCalling.member?.fullName ?? "Unknown",
+        targetCallingId: targetCalling.calling.id,
+        targetPositionName: `${targetCalling.position.positionName} (${targetCalling.organization.name})`,
+        sourceCallingId: sourceCalling.calling.id,
+        sourcePositionName: `${sourceCalling.position.positionName} (${sourceCalling.organization.name})`,
+      };
+
+      if (isFilledTarget && targetCalling.calling.memberId && !hasReleaseProposal) {
+        drop.replacingMemberId = targetCalling.calling.memberId;
+        drop.replacingMemberName = targetCalling.member?.fullName ?? "Unknown";
+      }
+
+      setPendingDrop(drop);
+    }
+  }
+
+  async function handleDropConfirm(action: "move" | "assign") {
+    if (!pendingDrop) return;
+
+    // If replacing someone in target, propose their release first
+    if (pendingDrop.replacingMemberId) {
+      await createReleaseProposal(
+        pendingDrop.targetCallingId,
+        pendingDrop.replacingMemberId
       );
     }
+
+    if (action === "move" && pendingDrop.sourceCallingId) {
+      await createMoveProposal(
+        pendingDrop.sourceCallingId,
+        pendingDrop.targetCallingId,
+        pendingDrop.memberId
+      );
+    } else {
+      // Assign only — keep old calling
+      await createAssignProposal(
+        pendingDrop.targetCallingId,
+        pendingDrop.memberId,
+        null
+      );
+    }
+
+    setPendingDrop(null);
   }
 
   const vacantCount = callings?.filter(
@@ -190,6 +275,7 @@ export function BoardView({
                     orgName={items[0]!.organization.name}
                     callings={items}
                     activeDropId={activeDropId}
+                    proposalMap={proposalMap}
                   />
                 ))}
               </div>
@@ -213,6 +299,52 @@ export function BoardView({
           />
         )}
       </DragOverlay>
+
+      {/* Drop confirmation dialog */}
+      {pendingDrop && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background rounded-lg shadow-xl p-6 max-w-md">
+            <h3 className="font-semibold mb-3">
+              Assign {pendingDrop.memberName}
+            </h3>
+            <p className="text-sm text-muted-foreground mb-1">
+              To: <strong className="text-foreground">{pendingDrop.targetPositionName}</strong>
+            </p>
+            {pendingDrop.sourcePositionName && (
+              <p className="text-sm text-muted-foreground mb-1">
+                From: <strong className="text-foreground">{pendingDrop.sourcePositionName}</strong>
+              </p>
+            )}
+            {pendingDrop.replacingMemberName && (
+              <p className="text-sm text-warning mt-2">
+                This will also propose releasing {pendingDrop.replacingMemberName} from the target position.
+              </p>
+            )}
+            <div className="flex flex-col gap-2 mt-4">
+              {pendingDrop.sourceCallingId && (
+                <button
+                  onClick={() => handleDropConfirm("move")}
+                  className="w-full px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  Move (release from {pendingDrop.sourcePositionName?.split(" (")[0]})
+                </button>
+              )}
+              <button
+                onClick={() => handleDropConfirm("assign")}
+                className="w-full px-4 py-2 text-sm font-medium rounded-md border hover:bg-muted transition-colors"
+              >
+                Assign Only (keep current calling)
+              </button>
+              <button
+                onClick={() => setPendingDrop(null)}
+                className="w-full px-4 py-2 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DndContext>
   );
 }

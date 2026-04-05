@@ -1,12 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { CallingList } from "@/components/board/CallingList";
 import { BoardView } from "@/components/board/BoardView";
 import { MemberSidebar } from "@/components/members/MemberSidebar";
 import { OrganizationFilter } from "@/components/filters/OrganizationFilter";
 import { ImportWizard } from "@/components/import/ImportWizard";
 import { ProposedChangesList } from "@/components/changes/ProposedChangesList";
+import { Dashboard } from "@/components/dashboard/Dashboard";
 import { seedDefaultData, clearAllData } from "@/data/import-service";
+import { downloadCsvExport, downloadJsonBackup, importFromJson } from "@/data/export-service";
 import { useProposalCount } from "@/hooks/useProposals";
+import { useDarkMode } from "@/hooks/useDarkMode";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/data/db";
 
@@ -15,15 +18,32 @@ type ViewMode = "list" | "board";
 function App() {
   const [showImport, setShowImport] = useState(false);
   const [showChanges, setShowChanges] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
   const [selectedOrg, setSelectedOrg] = useState<string | null>(null);
   const [showVacantOnly, setShowVacantOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("board");
 
   const memberCount = useLiveQuery(() => db.members.count());
   const callingCount = useLiveQuery(() => db.callings.count());
   const proposalCount = useProposalCount();
+  const { isDark, toggle: toggleDark } = useDarkMode();
+
+  const handleRestoreBackup = useCallback(async () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      await importFromJson(text);
+      setShowMenu(false);
+    };
+    input.click();
+  }, []);
 
   // Seed default data on first load
   useEffect(() => {
@@ -75,6 +95,13 @@ function App() {
             </button>
           </div>
 
+          <button
+            onClick={() => setShowDashboard(true)}
+            className="px-3 py-1.5 text-sm font-medium rounded-md border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            Dashboard
+          </button>
+
           {/* Changes button with badge */}
           <button
             onClick={() => setShowChanges(true)}
@@ -88,18 +115,64 @@ function App() {
             )}
           </button>
 
-          <button
-            onClick={() => setShowResetConfirm(true)}
-            className="px-3 py-1.5 text-sm font-medium rounded-md border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          >
-            Reset Data
-          </button>
-          <button
-            onClick={() => setShowImport(true)}
-            className="px-4 py-1.5 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            Import Data
-          </button>
+          {/* More menu */}
+          <div className="relative">
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="px-3 py-1.5 text-sm font-medium rounded-md border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              More
+            </button>
+            {showMenu && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowMenu(false)}
+                />
+                <div className="absolute right-0 top-full mt-1 w-48 bg-background border rounded-md shadow-lg z-50 py-1">
+                  <button
+                    onClick={() => { setShowImport(true); setShowMenu(false); }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                  >
+                    Import Data
+                  </button>
+                  <button
+                    onClick={() => { downloadCsvExport(); setShowMenu(false); }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                  >
+                    Export to CSV
+                  </button>
+                  <div className="border-t my-1" />
+                  <button
+                    onClick={() => { downloadJsonBackup(); setShowMenu(false); }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                  >
+                    Backup Data
+                  </button>
+                  <button
+                    onClick={handleRestoreBackup}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                  >
+                    Restore Backup
+                  </button>
+                  <div className="border-t my-1" />
+                  <button
+                    onClick={() => { toggleDark(); setShowMenu(false); }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                  >
+                    {isDark ? "Light Mode" : "Dark Mode"}
+                  </button>
+                  <div className="border-t my-1" />
+                  <button
+                    onClick={() => { setShowResetConfirm(true); setShowMenu(false); }}
+                    className="w-full text-left px-3 py-2 text-sm text-destructive hover:bg-muted transition-colors"
+                  >
+                    Reset Data
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -133,6 +206,11 @@ function App() {
           </main>
           <MemberSidebar isBoardView={false} />
         </div>
+      )}
+
+      {/* Dashboard modal */}
+      {showDashboard && (
+        <Dashboard onClose={() => setShowDashboard(false)} />
       )}
 
       {/* Import modal */}

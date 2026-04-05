@@ -156,11 +156,20 @@ export async function importCallings(
             }
           }
 
-          // Check for existing calling for this position
-          const existingCalling = await db.callings
+          // Check for existing callings for this position
+          const existingCallings = await db.callings
             .where("positionId")
             .equals(positionId)
-            .first();
+            .toArray();
+
+          // Find an available slot: a vacant calling or one with matching member
+          const matchingCalling = memberId
+            ? existingCallings.find((c) => c.memberId === memberId)
+            : null;
+          const vacantCalling = existingCallings.find(
+            (c) => c.status === "vacant"
+          );
+          const existingCalling = matchingCalling || vacantCalling;
 
           if (existingCalling) {
             // Update existing calling
@@ -171,7 +180,7 @@ export async function importCallings(
               status: memberId ? "active" : "vacant",
             });
           } else {
-            // Create new calling
+            // Create new calling (additional slot for multi-holder positions)
             await db.callings.add({
               id: generateId(),
               positionId,

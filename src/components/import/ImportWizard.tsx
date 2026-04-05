@@ -1,10 +1,11 @@
 import { useState, useCallback } from "react";
 import { parseLcrJson } from "@/data/import-parsers/lcr-json-parser";
 import { parseCsvCallings } from "@/data/import-parsers/csv-parser";
+import { parsePdfFile } from "@/data/import-parsers/pdf-parser";
 import { importCallings, importMembers } from "@/data/import-service";
 import type { ParsedCalling, ParsedMember } from "@/types/models";
 
-type Tab = "lcr-json" | "csv";
+type Tab = "lcr-json" | "csv" | "pdf";
 type Step = "input" | "preview" | "result";
 
 interface ImportResult {
@@ -21,8 +22,28 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
 
-  const handleParse = useCallback(() => {
+  const handleParse = useCallback(async () => {
+    if (activeTab === "pdf") {
+      if (!pdfFile) return;
+      setIsParsing(true);
+      try {
+        const { callings, errors } = await parsePdfFile(pdfFile);
+        setParsedCallings(callings);
+        setParsedMembers([]);
+        setParseErrors(errors);
+        setStep("preview");
+      } catch (e) {
+        setParseErrors([e instanceof Error ? e.message : "Failed to parse PDF"]);
+        setStep("preview");
+      } finally {
+        setIsParsing(false);
+      }
+      return;
+    }
+
     if (!inputText.trim()) return;
 
     if (activeTab === "lcr-json") {
@@ -37,7 +58,7 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
       setParseErrors(errors);
     }
     setStep("preview");
-  }, [inputText, activeTab]);
+  }, [inputText, activeTab, pdfFile]);
 
   const handleImport = useCallback(async () => {
     setIsImporting(true);
@@ -72,6 +93,15 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
         setInputText(event.target?.result as string);
       };
       reader.readAsText(file);
+    },
+    []
+  );
+
+  const handlePdfUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setPdfFile(file);
     },
     []
   );
@@ -112,6 +142,16 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
               onClick={() => setActiveTab("csv")}
             >
               CSV Upload
+            </button>
+            <button
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === "pdf"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => setActiveTab("pdf")}
+            >
+              LCR PDF
             </button>
           </div>
         )}
@@ -167,6 +207,34 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                   />
+                </>
+              )}
+
+              {activeTab === "pdf" && (
+                <>
+                  <div className="text-sm text-muted-foreground space-y-2">
+                    <p className="font-medium text-foreground">
+                      Upload an LCR &ldquo;Organizations and Callings&rdquo; PDF:
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1">
+                      <li>Log in to LCR in your browser</li>
+                      <li>Navigate to <strong>Callings</strong> &rarr; <strong>Organizations and Callings</strong></li>
+                      <li>Click <strong>Print</strong> to download the PDF</li>
+                      <li>Upload the PDF file below</li>
+                    </ol>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={handlePdfUpload}
+                    className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                  />
+                  {pdfFile && (
+                    <div className="text-sm text-muted-foreground">
+                      Selected: <strong className="text-foreground">{pdfFile.name}</strong>{" "}
+                      ({(pdfFile.size / 1024).toFixed(1)} KB)
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -277,10 +345,13 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
               </button>
               <button
                 onClick={handleParse}
-                disabled={!inputText.trim()}
+                disabled={
+                  isParsing ||
+                  (activeTab === "pdf" ? !pdfFile : !inputText.trim())
+                }
                 className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                Preview
+                {isParsing ? "Parsing..." : "Preview"}
               </button>
             </>
           )}

@@ -14,7 +14,7 @@ export function useProposals() {
   return useLiveQuery(async () => {
     const proposals = await db.proposedChanges
       .where("status")
-      .anyOf(["draft", "pending_approval", "approved"])
+      .anyOf(["draft", "pending_approval", "approved", "applied"])
       .toArray();
 
     const members = await db.members.toArray();
@@ -63,6 +63,45 @@ export function useProposalCount() {
       .anyOf(["draft", "pending_approval", "approved"])
       .count()
   );
+}
+
+export interface CallingProposal {
+  id: string;
+  type: "assign" | "release" | "move";
+  status: string;
+  toMemberName?: string;
+  fromMemberName?: string;
+}
+
+export function useProposalsByCallingId() {
+  return useLiveQuery(async () => {
+    const proposals = await db.proposedChanges
+      .where("status")
+      .anyOf(["draft", "pending_approval", "approved"])
+      .toArray();
+
+    const members = await db.members.toArray();
+    const memberMap = new Map(members.map((m) => [m.id, m]));
+
+    const map = new Map<string, CallingProposal[]>();
+    for (const p of proposals) {
+      if (!p.callingId) continue;
+      const entry: CallingProposal = {
+        id: p.id,
+        type: p.type as "assign" | "release" | "move",
+        status: p.status,
+        toMemberName: p.toMemberId
+          ? memberMap.get(p.toMemberId)?.fullName
+          : undefined,
+        fromMemberName: p.fromMemberId
+          ? memberMap.get(p.fromMemberId)?.fullName
+          : undefined,
+      };
+      if (!map.has(p.callingId)) map.set(p.callingId, []);
+      map.get(p.callingId)!.push(entry);
+    }
+    return map;
+  });
 }
 
 export async function createAssignProposal(
@@ -192,6 +231,54 @@ export async function applyAllApproved(): Promise<number> {
   }
 
   return approved.length;
+}
+
+export async function rewindProposal(id: string): Promise<void> {
+  const proposal = await db.proposedChanges.get(id);
+  if (!proposal) return;
+
+  type ProposalStatus = "draft" | "pending_approval" | "approved" | "applied";
+  const prevStatus: Partial<Record<ProposalStatus, ProposalStatus>> = {
+    pending_approval: "draft",
+    approved: "pending_approval",
+  };
+
+  const prev = prevStatus[proposal.status as ProposalStatus];
+  if (prev) {
+    await db.proposedChanges.update(id, {
+      status: prev,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+}
+
+export async function revertProposal(id: string): Promise<void> {
+  const proposal = await db.proposedChanges.get(id);
+  if (!proposal || proposal.status !== "applied") return;
+
+  await db.transaction("rw", [db.callings, db.proposedChanges], async () => {
+    if (proposal.callingId) {
+      if (proposal.type === "assign") {
+        // Undo assignment: restore to vacant (or previous member)
+        await db.callings.update(proposal.callingId, {
+          memberId: proposal.fromMemberId || null,
+          activeDate: proposal.fromMemberId ? new Date().toISOString().split("T")[0] : null,
+          status: proposal.fromMemberId ? "active" : "vacant",
+          setApart: false,
+        });
+      } else if (proposal.type === "release") {
+        // Undo release: restore the member
+        await db.callings.update(proposal.callingId, {
+          memberId: proposal.fromMemberId,
+          activeDate: new Date().toISOString().split("T")[0],
+          status: "active",
+          setApart: false,
+        });
+      }
+    }
+
+    await db.proposedChanges.delete(id);
+  });
 }
 
 export async function deleteProposal(id: string): Promise<void> {
