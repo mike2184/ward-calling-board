@@ -246,6 +246,16 @@ export function ProposedChangesList({ onClose }: Props) {
             >
               {showReport ? "Hide Report" : "Sustaining Report"}
             </button>
+            <button
+              onClick={async () => {
+                for (const p of proposals) {
+                  await deleteProposal(p.id);
+                }
+              }}
+              className="text-xs px-3 py-1.5 rounded border font-medium text-destructive hover:bg-destructive/10 transition-colors ml-auto"
+            >
+              Remove All
+            </button>
           </div>
         )}
 

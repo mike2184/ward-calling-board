@@ -19,7 +19,7 @@ function App() {
   const [showImport, setShowImport] = useState(false);
   const [showChanges, setShowChanges] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
-  const [selectedOrg, setSelectedOrg] = useState<string | null>(null);
+  const [selectedOrgs, setSelectedOrgs] = useState<Set<string>>(new Set());
   const [showVacantOnly, setShowVacantOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -179,8 +179,16 @@ function App() {
       {/* Filters */}
       <div className="border-b px-6 py-3 flex-shrink-0">
         <OrganizationFilter
-          selected={selectedOrg}
-          onSelect={setSelectedOrg}
+          selected={selectedOrgs}
+          onToggle={(orgId) =>
+            setSelectedOrgs((prev) => {
+              const next = new Set(prev);
+              if (next.has(orgId)) next.delete(orgId);
+              else next.add(orgId);
+              return next;
+            })
+          }
+          onClear={() => setSelectedOrgs(new Set())}
           showVacantOnly={showVacantOnly}
           onToggleVacant={() => setShowVacantOnly(!showVacantOnly)}
           searchQuery={searchQuery}
@@ -191,7 +199,7 @@ function App() {
       {/* Main content */}
       {viewMode === "board" ? (
         <BoardView
-          organizationFilter={selectedOrg}
+          organizationFilter={selectedOrgs}
           showVacantOnly={showVacantOnly}
           searchQuery={searchQuery}
         />
@@ -199,7 +207,7 @@ function App() {
         <div className="flex flex-1 overflow-hidden">
           <main className="flex-1 min-w-0 overflow-auto p-6">
             <CallingList
-              organizationFilter={selectedOrg}
+              organizationFilter={selectedOrgs}
               showVacantOnly={showVacantOnly}
               searchQuery={searchQuery}
             />

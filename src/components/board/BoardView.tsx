@@ -40,7 +40,7 @@ interface PendingDrop {
 }
 
 interface Props {
-  organizationFilter: string | null;
+  organizationFilter: Set<string>;
   showVacantOnly: boolean;
   searchQuery: string;
 }
@@ -54,7 +54,7 @@ export function BoardView({
   showVacantOnly,
   searchQuery,
 }: Props) {
-  const callings = useCallings(organizationFilter ?? undefined);
+  const callings = useCallings(organizationFilter.size > 0 ? organizationFilter : undefined);
   const proposalMap = useProposalsByCallingId();
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [activeDropId, setActiveDropId] = useState<string | null>(null);

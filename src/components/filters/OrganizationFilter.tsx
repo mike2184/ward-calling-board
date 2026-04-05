@@ -1,8 +1,9 @@
 import { useOrganizationsWithCounts } from "@/hooks/useCallings";
 
 interface Props {
-  selected: string | null;
-  onSelect: (orgId: string | null) => void;
+  selected: Set<string>;
+  onToggle: (orgId: string) => void;
+  onClear: () => void;
   showVacantOnly: boolean;
   onToggleVacant: () => void;
   searchQuery: string;
@@ -11,7 +12,8 @@ interface Props {
 
 export function OrganizationFilter({
   selected,
-  onSelect,
+  onToggle,
+  onClear,
   showVacantOnly,
   onToggleVacant,
   searchQuery,
@@ -24,9 +26,9 @@ export function OrganizationFilter({
       {/* Organization pills */}
       <div className="flex flex-wrap gap-2">
         <button
-          onClick={() => onSelect(null)}
+          onClick={onClear}
           className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
-            selected === null
+            selected.size === 0
               ? "bg-primary text-primary-foreground"
               : "bg-muted text-muted-foreground hover:bg-muted/80"
           }`}
@@ -36,9 +38,9 @@ export function OrganizationFilter({
         {orgsWithCounts?.map((org) => (
           <button
             key={org.id}
-            onClick={() => onSelect(org.id)}
+            onClick={() => onToggle(org.id)}
             className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors inline-flex items-center gap-1.5 ${
-              selected === org.id
+              selected.has(org.id)
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover:bg-muted/80"
             }`}
@@ -47,7 +49,7 @@ export function OrganizationFilter({
             {org.vacant > 0 && (
               <span
                 className={`text-xs px-1.5 py-0.5 rounded-full ${
-                  selected === org.id
+                  selected.has(org.id)
                     ? "bg-primary-foreground/20 text-primary-foreground"
                     : "bg-vacant/10 text-vacant"
                 }`}

@@ -15,7 +15,9 @@ export interface CallingWithDetails {
   member: Member | null;
 }
 
-export function useCallings(organizationFilter?: string) {
+export function useCallings(organizationFilter?: Set<string>) {
+  // Convert Set to sorted array for stable dependency
+  const filterKey = organizationFilter ? [...organizationFilter].sort().join(",") : "";
   return useLiveQuery(async () => {
     const callings = await db.callings.toArray();
     const positions = await db.callingPositions.toArray();
@@ -35,7 +37,7 @@ export function useCallings(organizationFilter?: string) {
       const organization = orgMap.get(position.organizationId);
       if (!organization) continue;
 
-      if (organizationFilter && organization.id !== organizationFilter)
+      if (organizationFilter && organizationFilter.size > 0 && !organizationFilter.has(organization.id))
         continue;
 
       results.push({
@@ -55,7 +57,7 @@ export function useCallings(organizationFilter?: string) {
     });
 
     return results;
-  }, [organizationFilter]);
+  }, [filterKey]);
 }
 
 export function useOrganizations() {

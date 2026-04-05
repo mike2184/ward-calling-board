@@ -41,12 +41,12 @@ export function MemberSidebar({ isBoardView }: Props) {
         )}
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Unassigned Members */}
-        <div className="border-b">
+        <div className={`border-b ${expandedSection === "unassigned" ? "flex-1 flex flex-col overflow-hidden" : ""}`}>
           <button
             onClick={() => toggleSection("unassigned")}
-            className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium hover:bg-muted/50 transition-colors"
+            className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium hover:bg-muted/50 transition-colors flex-shrink-0"
           >
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-warning" />
@@ -57,7 +57,7 @@ export function MemberSidebar({ isBoardView }: Props) {
             </span>
           </button>
           {expandedSection === "unassigned" && unassigned && (
-            <div className="px-2 pb-2 space-y-0.5">
+            <div className="px-2 pb-2 space-y-0.5 overflow-auto flex-1">
               {unassigned.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-2 px-2 italic">
                   All members have callings
@@ -81,10 +81,10 @@ export function MemberSidebar({ isBoardView }: Props) {
         </div>
 
         {/* Multi-Calling Members */}
-        <div className="border-b">
+        <div className={`border-b ${expandedSection === "multi" ? "flex-1 flex flex-col overflow-hidden" : ""}`}>
           <button
             onClick={() => toggleSection("multi")}
-            className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium hover:bg-muted/50 transition-colors"
+            className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium hover:bg-muted/50 transition-colors flex-shrink-0"
           >
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-vacant" />
@@ -95,7 +95,7 @@ export function MemberSidebar({ isBoardView }: Props) {
             </span>
           </button>
           {expandedSection === "multi" && multiCalling && (
-            <div className="px-2 pb-2 space-y-0.5">
+            <div className="px-2 pb-2 space-y-0.5 overflow-auto flex-1">
               {multiCalling.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-2 px-2 italic">
                   No members with multiple callings
@@ -123,10 +123,10 @@ export function MemberSidebar({ isBoardView }: Props) {
         </div>
 
         {/* All Members */}
-        <div>
+        <div className={`${expandedSection === "all" ? "flex-1 flex flex-col overflow-hidden" : ""}`}>
           <button
             onClick={() => toggleSection("all")}
-            className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium hover:bg-muted/50 transition-colors"
+            className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium hover:bg-muted/50 transition-colors flex-shrink-0"
           >
             <span>All Members</span>
             <span className="text-muted-foreground text-xs">
@@ -134,15 +134,15 @@ export function MemberSidebar({ isBoardView }: Props) {
             </span>
           </button>
           {expandedSection === "all" && (
-            <div className="px-2 pb-2">
+            <div className="px-2 pb-2 flex flex-col flex-1 overflow-hidden">
               <input
                 type="text"
                 placeholder="Search members..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-2 py-1 text-sm border rounded mb-2 bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full px-2 py-1 text-sm border rounded mb-2 bg-background focus:outline-none focus:ring-1 focus:ring-ring flex-shrink-0"
               />
-              <div className="space-y-0.5 max-h-60 overflow-auto">
+              <div className="space-y-0.5 overflow-auto flex-1">
                 {filteredMembers?.map((m) =>
                   isBoardView ? (
                     <DraggableMemberCard

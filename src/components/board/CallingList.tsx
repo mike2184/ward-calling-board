@@ -2,7 +2,7 @@ import { useCallings, type CallingWithDetails } from "@/hooks/useCallings";
 import { formatServingDurationShort } from "@/utils/time";
 
 interface Props {
-  organizationFilter: string | null;
+  organizationFilter: Set<string>;
   showVacantOnly: boolean;
   searchQuery: string;
 }
@@ -42,7 +42,7 @@ export function CallingList({
   showVacantOnly,
   searchQuery,
 }: Props) {
-  const callings = useCallings(organizationFilter ?? undefined);
+  const callings = useCallings(organizationFilter.size > 0 ? organizationFilter : undefined);
 
   if (!callings) {
     return (
