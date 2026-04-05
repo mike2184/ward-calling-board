@@ -227,7 +227,21 @@ export async function importMembers(
   for (const parsed of parsedMembers) {
     try {
       const fullName = parsed.fullName || `${parsed.firstName} ${parsed.lastName}`.trim();
-      if (memberNameMap.has(fullName.toLowerCase())) continue;
+      const existingId = memberNameMap.get(fullName.toLowerCase());
+
+      if (existingId) {
+        // Update existing member with any new data
+        const updates: Record<string, unknown> = {};
+        if (parsed.gender) updates.gender = parsed.gender;
+        if (parsed.age != null) updates.age = parsed.age;
+        if (parsed.phone) updates.phone = parsed.phone;
+        if (parsed.email) updates.email = parsed.email;
+        if (Object.keys(updates).length > 0) {
+          await db.members.update(existingId, updates);
+          imported++;
+        }
+        continue;
+      }
 
       const id = generateId();
       await db.members.add({

@@ -2,10 +2,11 @@ import { useState, useCallback } from "react";
 import { parseLcrJson } from "@/data/import-parsers/lcr-json-parser";
 import { parseCsvCallings } from "@/data/import-parsers/csv-parser";
 import { parsePdfFile } from "@/data/import-parsers/pdf-parser";
+import { parseMemberPdfFile } from "@/data/import-parsers/member-pdf-parser";
 import { importCallings, importMembers } from "@/data/import-service";
 import type { ParsedCalling, ParsedMember } from "@/types/models";
 
-type Tab = "lcr-json" | "csv" | "pdf";
+type Tab = "lcr-json" | "csv" | "pdf" | "member-pdf";
 type Step = "input" | "preview" | "result";
 
 interface ImportResult {
@@ -26,6 +27,24 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
 
   const handleParse = useCallback(async () => {
+    if (activeTab === "member-pdf") {
+      if (!pdfFile) return;
+      setIsParsing(true);
+      try {
+        const { members, errors } = await parseMemberPdfFile(pdfFile);
+        setParsedCallings([]);
+        setParsedMembers(members);
+        setParseErrors(errors);
+        setStep("preview");
+      } catch (e) {
+        setParseErrors([e instanceof Error ? e.message : "Failed to parse PDF"]);
+        setStep("preview");
+      } finally {
+        setIsParsing(false);
+      }
+      return;
+    }
+
     if (activeTab === "pdf") {
       if (!pdfFile) return;
       setIsParsing(true);
@@ -63,8 +82,12 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
   const handleImport = useCallback(async () => {
     setIsImporting(true);
     try {
-      const callingResult = await importCallings(parsedCallings);
+      let callingResult: ImportResult = { imported: 0, errors: [] };
       let memberResult: ImportResult = { imported: 0, errors: [] };
+
+      if (parsedCallings.length > 0) {
+        callingResult = await importCallings(parsedCallings);
+      }
       if (parsedMembers.length > 0) {
         memberResult = await importMembers(parsedMembers);
       }
@@ -151,7 +174,17 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
               }`}
               onClick={() => setActiveTab("pdf")}
             >
-              LCR PDF
+              Callings PDF
+            </button>
+            <button
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === "member-pdf"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => setActiveTab("member-pdf")}
+            >
+              Members PDF
             </button>
           </div>
         )}
@@ -237,6 +270,34 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
                   )}
                 </>
               )}
+
+              {activeTab === "member-pdf" && (
+                <>
+                  <div className="text-sm text-muted-foreground space-y-2">
+                    <p className="font-medium text-foreground">
+                      Upload an LCR &ldquo;Members without Callings&rdquo; PDF:
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1">
+                      <li>Log in to LCR in your browser</li>
+                      <li>Navigate to <strong>Reports</strong> &rarr; <strong>Members without Callings</strong></li>
+                      <li>Click <strong>Print</strong> to download the PDF</li>
+                      <li>Upload the PDF file below</li>
+                    </ol>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={handlePdfUpload}
+                    className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                  />
+                  {pdfFile && (
+                    <div className="text-sm text-muted-foreground">
+                      Selected: <strong className="text-foreground">{pdfFile.name}</strong>{" "}
+                      ({(pdfFile.size / 1024).toFixed(1)} KB)
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 
@@ -256,10 +317,14 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
               )}
 
               <div className="text-sm text-muted-foreground">
-                Found <strong className="text-foreground">{parsedCallings.length}</strong> callings
+                {parsedCallings.length > 0 && (
+                  <>Found <strong className="text-foreground">{parsedCallings.length}</strong> callings</>
+                )}
+                {parsedCallings.length > 0 && parsedMembers.length > 0 && " and "}
                 {parsedMembers.length > 0 && (
                   <>
-                    {" "}and <strong className="text-foreground">{parsedMembers.length}</strong> members
+                    {parsedCallings.length === 0 && "Found "}
+                    <strong className="text-foreground">{parsedMembers.length}</strong> members
                   </>
                 )}
               </div>
@@ -295,6 +360,31 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
                           <td className="px-3 py-1.5 text-muted-foreground">
                             {c.activeDate || "—"}
                           </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {parsedMembers.length > 0 && parsedCallings.length === 0 && (
+                <div className="border rounded-md overflow-auto max-h-80">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted sticky top-0">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-medium">Name</th>
+                        <th className="text-left px-3 py-2 font-medium">Gender</th>
+                        <th className="text-left px-3 py-2 font-medium">Age</th>
+                        <th className="text-left px-3 py-2 font-medium">Phone</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsedMembers.map((m, i) => (
+                        <tr key={i} className="border-t">
+                          <td className="px-3 py-1.5">{m.fullName}</td>
+                          <td className="px-3 py-1.5">{m.gender || "—"}</td>
+                          <td className="px-3 py-1.5">{m.age ?? "—"}</td>
+                          <td className="px-3 py-1.5 text-muted-foreground">{m.phone || "—"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -347,7 +437,7 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
                 onClick={handleParse}
                 disabled={
                   isParsing ||
-                  (activeTab === "pdf" ? !pdfFile : !inputText.trim())
+                  (activeTab === "pdf" || activeTab === "member-pdf" ? !pdfFile : !inputText.trim())
                 }
                 className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
@@ -365,10 +455,10 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
               </button>
               <button
                 onClick={handleImport}
-                disabled={parsedCallings.length === 0 || isImporting}
+                disabled={(parsedCallings.length === 0 && parsedMembers.length === 0) || isImporting}
                 className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {isImporting ? "Importing..." : `Import ${parsedCallings.length} Records`}
+                {isImporting ? "Importing..." : `Import ${parsedCallings.length + parsedMembers.length} Records`}
               </button>
             </>
           )}
