@@ -80,6 +80,32 @@ export function CallingCard({ item, isDragOverlay, proposals }: Props) {
   );
 }
 
+function ProposalLine({ proposal }: { proposal: CallingProposal }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-warning/15 text-warning flex-shrink-0">
+        {STATUS_LABEL[proposal.status] ?? proposal.status}
+      </span>
+      <span className="text-xs text-warning flex-1 truncate">
+        {proposal.type === "release" && `Release ${proposal.fromMemberName ?? ""}`}
+        {proposal.type === "assign" && `Assign ${proposal.toMemberName ?? ""}`}
+        {proposal.type === "move" && `Move ${proposal.toMemberName ?? ""}`}
+      </span>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          deleteProposal(proposal.id);
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        className="text-[10px] text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
 function CardContent({
   item,
   isVacant,
@@ -91,6 +117,9 @@ function CardContent({
   proposals?: CallingProposal[];
   onRelease?: () => void;
 }) {
+  const hasProposals = !!proposals && proposals.length > 0;
+  const hasReleaseProposal = hasProposals && proposals.some((p) => p.type === "release");
+
   return (
     <>
       <div className="flex items-start justify-between gap-1">
@@ -113,6 +142,9 @@ function CardContent({
       </div>
       {isVacant ? (
         <div className="text-sm text-vacant italic">Vacant</div>
+      ) : hasReleaseProposal ? (
+        // When there's a release proposal, show the current member de-emphasized
+        <div className="text-sm text-muted-foreground line-through">{item.member?.fullName}</div>
       ) : (
         <>
           <div className="text-sm font-medium">{item.member?.fullName}</div>
@@ -121,30 +153,10 @@ function CardContent({
           </div>
         </>
       )}
-      {proposals && proposals.length > 0 && (
+      {hasProposals && (
         <div className="mt-1.5 pt-1.5 border-t border-warning/30 space-y-1">
           {proposals.map((proposal, i) => (
-            <div key={i} className="flex items-center gap-1.5">
-              <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-warning/15 text-warning">
-                {STATUS_LABEL[proposal.status] ?? proposal.status}
-              </span>
-              <span className="text-xs text-warning flex-1">
-                {proposal.type === "release" && "Release"}
-                {proposal.type === "assign" && `← ${proposal.toMemberName}`}
-                {proposal.type === "move" && `→ ${proposal.toMemberName}`}
-              </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  deleteProposal(proposal.id);
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                className="text-[10px] text-muted-foreground hover:text-destructive transition-colors"
-              >
-                ✕
-              </button>
-            </div>
+            <ProposalLine key={i} proposal={proposal} />
           ))}
         </div>
       )}
@@ -162,38 +174,15 @@ export function VacantDropTarget({
   proposals?: CallingProposal[];
 }) {
   if (proposals && proposals.length > 0) {
-    const assignProposal = proposals.find((p) => p.type === "assign");
     return (
       <div className="rounded-lg p-3 border-l-4 border-l-warning border border-warning/30 bg-warning/5 transition-colors">
         <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
           {positionName}
         </div>
-        {assignProposal && (
-          <div className="text-sm font-medium text-warning">
-            {assignProposal.toMemberName ?? "Unknown"}
-          </div>
-        )}
-        <div className="space-y-1 mt-1">
+        <div className="text-sm text-vacant italic">Vacant</div>
+        <div className="mt-1.5 pt-1.5 border-t border-warning/30 space-y-1">
           {proposals.map((p, i) => (
-            <div key={i} className="flex items-center gap-1.5">
-              <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-warning/15 text-warning">
-                {STATUS_LABEL[p.status] ?? p.status}
-              </span>
-              <span className="text-xs text-muted-foreground flex-1">
-                {p.type === "assign" ? "Proposed" : p.type}
-              </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  deleteProposal(p.id);
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                className="text-[10px] text-muted-foreground hover:text-destructive transition-colors"
-              >
-                ✕
-              </button>
-            </div>
+            <ProposalLine key={i} proposal={p} />
           ))}
         </div>
       </div>

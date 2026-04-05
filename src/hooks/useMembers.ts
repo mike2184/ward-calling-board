@@ -16,15 +16,22 @@ export function useMembersWithCallingInfo() {
     const members = await db.members.orderBy("lastName").toArray();
     const callings = await db.callings.toArray();
     const positions = await db.callingPositions.toArray();
+    const organizations = await db.organizations.toArray();
 
     const posMap = new Map(positions.map((p) => [p.id, p]));
+    const orgMap = new Map(organizations.map((o) => [o.id, o]));
 
     return members.map((member): MemberWithCallingInfo => {
       const memberCallings = callings.filter(
         (c) => c.memberId === member.id && c.status === "active"
       );
       const callingNames = memberCallings
-        .map((c) => posMap.get(c.positionId)?.positionName ?? "Unknown")
+        .map((c) => {
+          const pos = posMap.get(c.positionId);
+          if (!pos) return "Unknown";
+          const org = orgMap.get(pos.organizationId);
+          return org ? `${pos.positionName} (${org.name})` : pos.positionName;
+        })
         .sort();
 
       return {
@@ -56,8 +63,10 @@ export function useMultiCallingMembers() {
     const members = await db.members.toArray();
     const callings = await db.callings.toArray();
     const positions = await db.callingPositions.toArray();
+    const organizations = await db.organizations.toArray();
 
     const posMap = new Map(positions.map((p) => [p.id, p]));
+    const orgMap = new Map(organizations.map((o) => [o.id, o]));
 
     const result: MemberWithCallingInfo[] = [];
 
@@ -70,7 +79,12 @@ export function useMultiCallingMembers() {
           ...member,
           callingCount: memberCallings.length,
           callingNames: memberCallings
-            .map((c) => posMap.get(c.positionId)?.positionName ?? "Unknown")
+            .map((c) => {
+              const pos = posMap.get(c.positionId);
+              if (!pos) return "Unknown";
+              const org = orgMap.get(pos.organizationId);
+              return org ? `${pos.positionName} (${org.name})` : pos.positionName;
+            })
             .sort(),
         });
       }
