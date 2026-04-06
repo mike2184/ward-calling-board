@@ -205,9 +205,9 @@ export function ProposedChangesList({ onClose }: Props) {
 
   if (!proposals) return null;
 
-  // Group by status for the report view
-  const releases = proposals.filter((p) => p.type === "release" && p.status === "approved");
-  const assignments = proposals.filter((p) => p.type === "assign" && p.status === "approved");
+  // Group for the report view (all non-applied proposals)
+  const releases = proposals.filter((p) => p.type === "release" && p.status !== "applied");
+  const assignments = proposals.filter((p) => (p.type === "assign" || p.type === "move") && p.status !== "applied");
 
   return (
     <div className="fixed inset-0 bg-black/50 flex justify-end z-50">

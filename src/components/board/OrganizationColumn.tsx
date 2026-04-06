@@ -24,7 +24,7 @@ export function OrganizationColumn({
   ).length;
 
   return (
-    <div className="w-64 flex-shrink-0 flex flex-col bg-muted/30 rounded-lg border">
+    <div className="w-64 flex-shrink-0 bg-muted/30 rounded-lg border">
       {/* Column header */}
       <div className="px-3 py-2.5 border-b bg-muted/50 rounded-t-lg">
         <div className="flex items-center justify-between">
@@ -40,7 +40,7 @@ export function OrganizationColumn({
       </div>
 
       {/* Callings list */}
-      <div className="flex-1 overflow-auto p-2 space-y-2">
+      <div className="p-2 space-y-2">
         {callings.map((item) => {
           const proposals = proposalMap?.get(item.calling.id);
           if (item.calling.status === "vacant") {

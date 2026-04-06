@@ -275,14 +275,15 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
                 <>
                   <div className="text-sm text-muted-foreground space-y-2">
                     <p className="font-medium text-foreground">
-                      Upload an LCR &ldquo;Members without Callings&rdquo; PDF:
+                      Upload an LCR Member List PDF:
                     </p>
                     <ol className="list-decimal list-inside space-y-1">
                       <li>Log in to LCR in your browser</li>
-                      <li>Navigate to <strong>Reports</strong> &rarr; <strong>Members without Callings</strong></li>
+                      <li>Navigate to <strong>Reports</strong> &rarr; <strong>Member List</strong> (or <strong>Members without Callings</strong>)</li>
                       <li>Click <strong>Print</strong> to download the PDF</li>
                       <li>Upload the PDF file below</li>
                     </ol>
+                    <p className="text-xs">Supports both &ldquo;Member List&rdquo; and &ldquo;Members without Callings&rdquo; PDF formats.</p>
                   </div>
                   <input
                     type="file"
@@ -376,6 +377,7 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
                         <th className="text-left px-3 py-2 font-medium">Gender</th>
                         <th className="text-left px-3 py-2 font-medium">Age</th>
                         <th className="text-left px-3 py-2 font-medium">Phone</th>
+                        <th className="text-left px-3 py-2 font-medium">Email</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -385,6 +387,7 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
                           <td className="px-3 py-1.5">{m.gender || "—"}</td>
                           <td className="px-3 py-1.5">{m.age ?? "—"}</td>
                           <td className="px-3 py-1.5 text-muted-foreground">{m.phone || "—"}</td>
+                          <td className="px-3 py-1.5 text-muted-foreground truncate max-w-[200px]">{m.email || "—"}</td>
                         </tr>
                       ))}
                     </tbody>

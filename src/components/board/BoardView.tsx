@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -42,6 +42,7 @@ interface PendingDrop {
 interface Props {
   organizationFilter: Set<string>;
   showVacantOnly: boolean;
+  showProposedOnly: boolean;
   searchQuery: string;
 }
 
@@ -52,6 +53,7 @@ type DragItem =
 export function BoardView({
   organizationFilter,
   showVacantOnly,
+  showProposedOnly,
   searchQuery,
 }: Props) {
   const callings = useCallings(organizationFilter.size > 0 ? organizationFilter : undefined);
@@ -59,6 +61,48 @@ export function BoardView({
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [activeDropId, setActiveDropId] = useState<string | null>(null);
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
+
+  // Synced horizontal scrollbar refs
+  const contentRef = useRef<HTMLDivElement>(null);
+  const scrollbarRef = useRef<HTMLDivElement>(null);
+  const [contentWidth, setContentWidth] = useState(0);
+  const syncing = useRef(false);
+  const observerRef = useRef<ResizeObserver | null>(null);
+
+  const syncScroll = useCallback((source: "content" | "scrollbar") => {
+    if (syncing.current) return;
+    syncing.current = true;
+    const from = source === "content" ? contentRef.current : scrollbarRef.current;
+    const to = source === "content" ? scrollbarRef.current : contentRef.current;
+    if (from && to) {
+      to.scrollLeft = from.scrollLeft;
+    }
+    syncing.current = false;
+  }, []);
+
+  // Callback ref to observe the inner content div's width
+  const innerRef = useCallback((node: HTMLDivElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+    if (node) {
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setContentWidth(entry.borderBoxSize?.[0]?.inlineSize ?? entry.contentRect.width);
+        }
+      });
+      observer.observe(node);
+      observerRef.current = observer;
+      // Set initial width
+      setContentWidth(node.getBoundingClientRect().width);
+    }
+  }, []);
+
+  // Clean up observer on unmount
+  useEffect(() => {
+    return () => observerRef.current?.disconnect();
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -72,6 +116,12 @@ export function BoardView({
     let filtered = callings;
     if (showVacantOnly) {
       filtered = filtered.filter((c) => c.calling.status === "vacant");
+    }
+    if (showProposedOnly) {
+      filtered = filtered.filter((c) => {
+        const proposals = proposalMap.get(c.calling.id);
+        return proposals && proposals.length > 0;
+      });
     }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -90,7 +140,7 @@ export function BoardView({
       map.get(key)!.push(item);
     }
     return map;
-  }, [callings, showVacantOnly, searchQuery]);
+  }, [callings, showVacantOnly, showProposedOnly, searchQuery, proposalMap]);
 
   function handleDragStart(event: DragStartEvent) {
     const data = event.active.data.current;
@@ -238,7 +288,7 @@ export function BoardView({
     >
       <div className="flex flex-1 overflow-hidden">
         {/* Board area */}
-        <main className="flex-1 min-w-0 overflow-auto p-6">
+        <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
           {!callings ? (
             <div className="text-center py-12 text-muted-foreground">
               Loading...
@@ -250,8 +300,8 @@ export function BoardView({
                 : "No callings match your filters."}
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="flex items-center gap-6 text-sm">
+            <>
+              <div className="flex items-center gap-6 text-sm px-6 pt-6 pb-3 flex-shrink-0">
                 <span className="text-muted-foreground">
                   Total:{" "}
                   <strong className="text-foreground">
@@ -268,18 +318,34 @@ export function BoardView({
                 </span>
               </div>
 
-              <div className="flex gap-3 overflow-x-auto pb-4">
-                {Array.from(grouped.entries()).map(([orgId, items]) => (
-                  <OrganizationColumn
-                    key={orgId}
-                    orgName={items[0]!.organization.name}
-                    callings={items}
-                    activeDropId={activeDropId}
-                    proposalMap={proposalMap}
-                  />
-                ))}
+              {/* Vertical scroll area — all columns scroll together */}
+              <div
+                ref={contentRef}
+                className="flex-1 overflow-y-auto overflow-x-hidden px-6"
+                onScroll={() => syncScroll("content")}
+              >
+                <div ref={innerRef} className="flex gap-3 w-max pb-4">
+                  {Array.from(grouped.entries()).map(([orgId, items]) => (
+                    <OrganizationColumn
+                      key={orgId}
+                      orgName={items[0]!.organization.name}
+                      callings={items}
+                      activeDropId={activeDropId}
+                      proposalMap={proposalMap}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+
+              {/* Pinned horizontal scrollbar */}
+              <div
+                ref={scrollbarRef}
+                className="overflow-x-auto overflow-y-hidden flex-shrink-0 px-6"
+                onScroll={() => syncScroll("scrollbar")}
+              >
+                <div style={{ width: contentWidth, height: 1 }} />
+              </div>
+            </>
           )}
         </main>
 

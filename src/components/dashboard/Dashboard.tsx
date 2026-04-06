@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/data/db";
 
@@ -101,10 +102,12 @@ export function Dashboard({ onClose }: { onClose: () => void }) {
       multiCallingCount: multiCalling.length,
       pendingProposals: proposals.length,
       orgStats,
-      longestServing: filledCallings.slice(0, 5),
+      longestServing: filledCallings,
       fillRate: callings.length > 0 ? Math.round((totalFilled / callings.length) * 100) : 0,
     };
   });
+
+  const [longestServingCount, setLongestServingCount] = useState(10);
 
   if (!stats) return null;
 
@@ -138,6 +141,60 @@ export function Dashboard({ onClose }: { onClose: () => void }) {
             <StatCard label="Pending Changes" value={stats.pendingProposals} color="text-primary" />
           </div>
 
+          {/* Longest serving */}
+          {stats.longestServing.length > 0 && (
+            <div>
+              <h3 className="font-semibold text-sm mb-3">Longest Serving</h3>
+              <div className="border rounded-md overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-medium">Member</th>
+                      <th className="text-left px-3 py-2 font-medium">Calling</th>
+                      <th className="text-left px-3 py-2 font-medium">Since</th>
+                      <th className="text-right px-3 py-2 font-medium">Serving</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.longestServing.slice(0, longestServingCount).map((item, i) => (
+                      <tr key={i} className="border-t">
+                        <td className="px-3 py-1.5">{item.memberName}</td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {item.positionName}
+                          {item.orgName && (
+                            <span className="text-xs"> ({item.orgName})</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-1.5 text-muted-foreground">
+                          {item.activeDate}
+                        </td>
+                        <td className="px-3 py-1.5 text-right font-medium whitespace-nowrap">
+                          {formatDuration(item.daysServing)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {stats.longestServing.length > longestServingCount && (
+                <button
+                  onClick={() => setLongestServingCount((c) => c + 10)}
+                  className="mt-2 text-xs text-primary hover:underline"
+                >
+                  Show more ({stats.longestServing.length - longestServingCount} remaining)
+                </button>
+              )}
+              {longestServingCount > 10 && (
+                <button
+                  onClick={() => setLongestServingCount(10)}
+                  className="mt-2 ml-3 text-xs text-muted-foreground hover:underline"
+                >
+                  Show less
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Org breakdown */}
           <div>
             <h3 className="font-semibold text-sm mb-3">By Organization</h3>
@@ -160,48 +217,21 @@ export function Dashboard({ onClose }: { onClose: () => void }) {
               ))}
             </div>
           </div>
-
-          {/* Longest serving */}
-          {stats.longestServing.length > 0 && (
-            <div>
-              <h3 className="font-semibold text-sm mb-3">Longest Serving</h3>
-              <div className="border rounded-md overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-medium">Member</th>
-                      <th className="text-left px-3 py-2 font-medium">Calling</th>
-                      <th className="text-left px-3 py-2 font-medium">Since</th>
-                      <th className="text-right px-3 py-2 font-medium">Days</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.longestServing.map((item, i) => (
-                      <tr key={i} className="border-t">
-                        <td className="px-3 py-1.5">{item.memberName}</td>
-                        <td className="px-3 py-1.5 text-muted-foreground">
-                          {item.positionName}
-                          {item.orgName && (
-                            <span className="text-xs"> ({item.orgName})</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-1.5 text-muted-foreground">
-                          {item.activeDate}
-                        </td>
-                        <td className="px-3 py-1.5 text-right font-medium">
-                          {item.daysServing.toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
   );
+}
+
+function formatDuration(totalDays: number): string {
+  const years = Math.floor(totalDays / 365);
+  const months = Math.floor((totalDays % 365) / 30);
+  const days = totalDays % 30;
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years}y`);
+  if (months > 0) parts.push(`${months}m`);
+  if (days > 0 || parts.length === 0) parts.push(`${days}d`);
+  return parts.join(" ");
 }
 
 function StatCard({

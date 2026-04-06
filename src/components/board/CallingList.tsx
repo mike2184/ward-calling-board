@@ -1,9 +1,11 @@
 import { useCallings, type CallingWithDetails } from "@/hooks/useCallings";
+import { useProposalsByCallingId } from "@/hooks/useProposals";
 import { formatServingDurationShort } from "@/utils/time";
 
 interface Props {
   organizationFilter: Set<string>;
   showVacantOnly: boolean;
+  showProposedOnly: boolean;
   searchQuery: string;
 }
 
@@ -40,9 +42,11 @@ function CallingRow({ item }: { item: CallingWithDetails }) {
 export function CallingList({
   organizationFilter,
   showVacantOnly,
+  showProposedOnly,
   searchQuery,
 }: Props) {
   const callings = useCallings(organizationFilter.size > 0 ? organizationFilter : undefined);
+  const proposalMap = useProposalsByCallingId();
 
   if (!callings) {
     return (
@@ -56,6 +60,13 @@ export function CallingList({
 
   if (showVacantOnly) {
     filtered = filtered.filter((c) => c.calling.status === "vacant");
+  }
+
+  if (showProposedOnly) {
+    filtered = filtered.filter((c) => {
+      const proposals = proposalMap.get(c.calling.id);
+      return proposals && proposals.length > 0;
+    });
   }
 
   if (searchQuery) {

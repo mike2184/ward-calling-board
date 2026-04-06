@@ -9,6 +9,7 @@ import { DraggableMemberCard } from "./DraggableMemberCard";
 import type { Member } from "@/types/models";
 
 type AgeFilter = "all" | "children" | "youth" | "adults";
+type GenderFilter = "all" | "M" | "F";
 type SortOption = "name" | "age-asc" | "age-desc";
 
 interface Props {
@@ -20,6 +21,11 @@ function ageFilterLabel(filter: AgeFilter): string {
   if (filter === "youth") return "11-17";
   if (filter === "adults") return "18+";
   return "All";
+}
+
+function matchesGenderFilter(member: { gender?: "M" | "F" }, filter: GenderFilter): boolean {
+  if (filter === "all") return true;
+  return member.gender === filter;
 }
 
 function matchesAgeFilter(member: { age?: number }, filter: AgeFilter): boolean {
@@ -69,6 +75,7 @@ export function MemberSidebar({ isBoardView }: Props) {
     "unassigned"
   );
   const [ageFilter, setAgeFilter] = useState<AgeFilter>("all");
+  const [genderFilter, setGenderFilter] = useState<GenderFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("name");
 
   const unassigned = useUnassignedMembers();
@@ -77,32 +84,32 @@ export function MemberSidebar({ isBoardView }: Props) {
 
   const filteredUnassigned = useMemo(() => {
     if (!unassigned) return undefined;
-    let result = unassigned.filter((m) => matchesAgeFilter(m, ageFilter));
+    let result = unassigned.filter((m) => matchesAgeFilter(m, ageFilter) && matchesGenderFilter(m, genderFilter));
     return sortMembers(result, sortBy);
-  }, [unassigned, ageFilter, sortBy]);
+  }, [unassigned, ageFilter, genderFilter, sortBy]);
 
   const filteredMulti = useMemo(() => {
     if (!multiCalling) return undefined;
-    let result = multiCalling.filter((m) => matchesAgeFilter(m, ageFilter));
+    let result = multiCalling.filter((m) => matchesAgeFilter(m, ageFilter) && matchesGenderFilter(m, genderFilter));
     return sortMembers(result, sortBy);
-  }, [multiCalling, ageFilter, sortBy]);
+  }, [multiCalling, ageFilter, genderFilter, sortBy]);
 
   const filteredMembers = useMemo(() => {
     if (!allMembers) return undefined;
-    let result: MemberWithCallingInfo[] = allMembers.filter((m) => matchesAgeFilter(m, ageFilter));
+    let result: MemberWithCallingInfo[] = allMembers.filter((m) => matchesAgeFilter(m, ageFilter) && matchesGenderFilter(m, genderFilter));
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter((m) => m.fullName.toLowerCase().includes(q));
     }
     return sortMembers(result, sortBy);
-  }, [allMembers, ageFilter, sortBy, searchQuery]);
+  }, [allMembers, ageFilter, genderFilter, sortBy, searchQuery]);
 
   const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
   };
 
   return (
-    <div className="w-64 flex-shrink-0 border-l bg-muted/20 flex flex-col h-full overflow-hidden">
+    <div className="w-72 flex-shrink-0 border-l bg-muted/20 flex flex-col h-full overflow-hidden">
       <div className="px-4 py-3 border-b">
         <h3 className="font-semibold text-sm">Members</h3>
         {isBoardView && (
@@ -126,6 +133,20 @@ export function MemberSidebar({ isBoardView }: Props) {
               }`}
             >
               {ageFilterLabel(f)}
+            </button>
+          ))}
+          <span className="w-px bg-border mx-0.5" />
+          {(["all", "M", "F"] as GenderFilter[]).map((f) => (
+            <button
+              key={f}
+              onClick={() => setGenderFilter(f)}
+              className={`px-2 py-0.5 text-[11px] font-medium rounded-full transition-colors ${
+                genderFilter === f
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              {f === "all" ? "A" : f}
             </button>
           ))}
         </div>
@@ -234,13 +255,23 @@ export function MemberSidebar({ isBoardView }: Props) {
           </button>
           {expandedSection === "all" && (
             <div className="px-2 pb-2 flex flex-col flex-1 overflow-hidden">
-              <input
-                type="text"
-                placeholder="Search members..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-2 py-1 text-sm border rounded mb-2 bg-background focus:outline-none focus:ring-1 focus:ring-ring flex-shrink-0"
-              />
+              <div className="relative mt-1 mb-2 flex-shrink-0">
+                <input
+                  type="text"
+                  placeholder="Search members..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-2 py-1 pr-7 text-sm border rounded bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
               <div className="space-y-0.5 overflow-auto flex-1">
                 {filteredMembers?.map((m) =>
                   isBoardView ? (

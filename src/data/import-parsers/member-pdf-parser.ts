@@ -1,10 +1,11 @@
 import type { ParsedMember } from "@/types/models";
 
 /**
- * Parses the text content extracted from an LCR "Members without Callings" PDF.
+ * Parses the text content extracted from LCR member PDFs.
  *
- * Each line follows the pattern:
- *   Last, First  Gender  Age  DD Mon YYYY  [(phone)]
+ * Supports two formats:
+ * 1. "Members without Callings" — Last, First  M/F  Age  DD Mon YYYY  [(phone)]
+ * 2. "Member List" (all members) — Last, First  M/F  Age  DD Mon YYYY phone  email
  *
  * Header/footer lines and the "Count: N" summary are skipped.
  */
@@ -14,6 +15,8 @@ const SKIP_PATTERNS = [
   /Canyon View/,
   /Orem Utah/,
   /Members without Callings/,
+  /^Member List/,
+  /^Individuals/,
   /For Church Use Only/,
   /Intellectual Reserve/,
   /^\d+$/,
@@ -22,8 +25,8 @@ const SKIP_PATTERNS = [
   /^April\s+\d/,
 ];
 
-const DATE_PATTERN = /(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})/;
-const PHONE_PATTERN = /\((\d{3})\)\s*(\d{3})-(\d{4})/;
+const PHONE_PATTERN = /(?:\((\d{3})\)\s*(\d{3})-(\d{4})|([\d+][\d+-]{6,}))/;
+const EMAIL_PATTERN = /([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/;
 
 function shouldSkipLine(line: string): boolean {
   const trimmed = line.trim();
@@ -35,23 +38,16 @@ function parseLine(line: string): ParsedMember | null {
   const trimmed = line.trim();
   if (!trimmed || shouldSkipLine(trimmed)) return null;
 
-  // Extract phone number if present
-  let phone: string | undefined;
-  const phoneMatch = trimmed.match(PHONE_PATTERN);
-  if (phoneMatch) {
-    phone = `(${phoneMatch[1]}) ${phoneMatch[2]}-${phoneMatch[3]}`;
-  }
-
   // Find the comma that separates "Last, First"
   const commaIdx = trimmed.indexOf(",");
   if (commaIdx === -1) return null;
 
   const lastName = trimmed.substring(0, commaIdx).trim();
 
-  // After the comma, parse: First  Gender  Age  Date  [Phone]
+  // After the comma, parse: First  Gender  Age  Date  [Phone]  [Email]
   const rest = trimmed.substring(commaIdx + 1).trim();
 
-  // Match: FirstName  M/F  Age  Date  [Phone]
+  // Match: FirstName  M/F  Age  Date
   const match = rest.match(
     /^(.+?)\s+(M|F)\s+(\d+)\s+\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}/
   );
@@ -61,6 +57,32 @@ function parseLine(line: string): ParsedMember | null {
   const gender = match[2] as "M" | "F";
   const age = parseInt(match[3], 10);
 
+  // Extract phone number if present
+  let phone: string | undefined;
+  const phoneMatch = trimmed.match(PHONE_PATTERN);
+  if (phoneMatch) {
+    if (phoneMatch[1]) {
+      phone = `(${phoneMatch[1]}) ${phoneMatch[2]}-${phoneMatch[3]}`;
+    } else if (phoneMatch[4]) {
+      // Raw phone like "801-735-3613" or "+18018307751"
+      const raw = phoneMatch[4].replace(/[^\d]/g, "");
+      if (raw.length === 10) {
+        phone = `(${raw.slice(0, 3)}) ${raw.slice(3, 6)}-${raw.slice(6)}`;
+      } else if (raw.length === 11 && raw.startsWith("1")) {
+        phone = `(${raw.slice(1, 4)}) ${raw.slice(4, 7)}-${raw.slice(7)}`;
+      } else {
+        phone = phoneMatch[4];
+      }
+    }
+  }
+
+  // Extract email if present
+  let email: string | undefined;
+  const emailMatch = trimmed.match(EMAIL_PATTERN);
+  if (emailMatch) {
+    email = emailMatch[1];
+  }
+
   return {
     firstName,
     lastName,
@@ -68,6 +90,7 @@ function parseLine(line: string): ParsedMember | null {
     gender,
     age: isNaN(age) ? undefined : age,
     phone,
+    email,
   };
 }
 
@@ -77,7 +100,7 @@ export interface MemberPdfParseResult {
 }
 
 /**
- * Parses extracted text from an LCR "Members without Callings" PDF.
+ * Parses extracted text from an LCR member PDF (all members or without callings).
  */
 export function parseMemberPdfText(text: string): MemberPdfParseResult {
   const lines = text.split("\n");
@@ -103,7 +126,7 @@ export function parseMemberPdfText(text: string): MemberPdfParseResult {
 }
 
 /**
- * Extracts text from a "Members without Callings" PDF file, then parses it.
+ * Extracts text from an LCR member PDF file, then parses it.
  */
 export async function parseMemberPdfFile(file: File): Promise<MemberPdfParseResult> {
   const pdfjsLib = await import("pdfjs-dist");
