@@ -321,7 +321,7 @@ export function BoardView({
               {/* Vertical scroll area — all columns scroll together */}
               <div
                 ref={contentRef}
-                className="flex-1 overflow-y-auto overflow-x-hidden px-6"
+                className="flex-1 overflow-y-auto overflow-x-auto px-6"
                 onScroll={() => syncScroll("content")}
               >
                 <div ref={innerRef} className="flex gap-3 w-max pb-4">
