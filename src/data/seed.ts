@@ -136,17 +136,13 @@ export const defaultPositions: CallingPosition[] = [
   pos("primary-secretary", "primary", "Secretary", 4),
   pos("primary-pianist", "primary", "Pianist", 5, false),
   pos("primary-music", "primary", "Music Leader", 6, false),
-  pos("primary-teacher", "primary", "Teacher", 7, false, 16),
-  pos("nursery-leader", "primary", "Nursery Leader", 8, false, 6),
-  pos("valiant-activities", "primary", "Valiant Activities Leader", 9, false, 6),
 
   // Sunday School
   pos("ss-president", "sunday-school", "President", 1),
   pos("ss-1st", "sunday-school", "1st Counselor", 2, false),
   pos("ss-2nd", "sunday-school", "2nd Counselor", 3, false),
   pos("ss-secretary", "sunday-school", "Secretary", 4, false),
-  pos("ss-teacher", "sunday-school", "Teacher", 5, false, 14),
-  pos("ss-resource-center", "sunday-school", "Resource Center Specialist", 6, false, 3),
+  pos("ss-resource-center", "sunday-school", "Resource Center Specialist", 5, false, 3),
 
   // Ward Missionaries
   pos("wml", "ward-missionaries", "Ward Mission Leader", 1),

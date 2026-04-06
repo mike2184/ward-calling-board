@@ -273,26 +273,60 @@ export interface PdfParseResult {
 /**
  * Parses extracted text from an LCR Organizations and Callings PDF.
  */
-// Regex to detect YW class sub-headers like "Young Women 15-18 Class Presidency",
-// "Young Women 12-14 Class Adult Leaders", etc. Captures the age range.
-const YW_CLASS_HEADER = /^Young Women\s+(\d+-\d+)\s+Class/;
-
-// Class-level position prefixes that should be qualified with the age range
-const YW_CLASS_POSITIONS = [
-  "Class President",
-  "Class 1st Counselor",
-  "Class 2nd Counselor",
-  "Class First Counselor",
-  "Class Second Counselor",
-  "Class Secretary",
-  "Class Adviser",
-];
-
-function isYwClassPosition(position: string): boolean {
-  return YW_CLASS_POSITIONS.some(
-    (p) => position.toLowerCase() === p.toLowerCase()
-  );
+// Sub-header detection rules: each rule matches a PDF section header line,
+// extracts a qualifier, and specifies which org and positions it applies to.
+interface SubHeaderRule {
+  /** Regex to match the sub-header line. Must have a capture group for the qualifier. */
+  pattern: RegExp;
+  /** Function to abbreviate the captured group into a short prefix */
+  abbreviate: (match: RegExpMatchArray) => string;
+  /** The organization this sub-header applies to */
+  org: string;
+  /** Position names (lowercase) that should be qualified. If null, qualify all positions. */
+  positions: string[] | null;
 }
+
+const SUB_HEADER_RULES: SubHeaderRule[] = [
+  {
+    // "Young Women 15-18 Class Presidency", "Young Women 12-14 Class Adult Leaders"
+    pattern: /^Young Women\s+(\d+-\d+)\s+Class/,
+    abbreviate: (m) => `YW ${m[1]}`,
+    org: "Young Women",
+    positions: [
+      "class president", "class 1st counselor", "class 2nd counselor",
+      "class first counselor", "class second counselor",
+      "class secretary", "class adviser",
+    ],
+  },
+  {
+    // "Primary Activities - Boys", "Primary Activities - Girls"
+    pattern: /^Primary Activities\s*[-–—]\s*(.+)/,
+    abbreviate: (m) => m[1].trim(),
+    org: "Primary",
+    positions: null, // qualify all positions under this sub-header
+  },
+  {
+    // Primary class sub-headers: "Valiant 9, Valiant 10   Room: 21", "CTR 5   Room: 6", "Sunbeam   Room: ...", "Nursery   Room: ..."
+    pattern: /^((?:Valiant|CTR|Sunbeam|Nursery)[\w\s,()]+?)\s+Room:/,
+    abbreviate: (m) => m[1].replace(/\s+/g, " ").trim(),
+    org: "Primary",
+    positions: ["teacher"],
+  },
+  {
+    // Sunday School class sub-headers: "Gospel Doctrine   Room: ...", "Course 15, Course 16   Room: ..."
+    pattern: /^((?:Gospel Doctrine|Course)[\w\s,]+?)\s+Room:/,
+    abbreviate: (m) => m[1].replace(/\s+/g, " ").trim(),
+    org: "Sunday School",
+    positions: ["teacher"],
+  },
+  {
+    // "Unassigned Teachers" section — reset qualifier so these don't get a class prefix
+    pattern: /^Unassigned Teachers$/,
+    abbreviate: () => "",
+    org: "", // special: handled as a reset
+    positions: null,
+  },
+];
 
 export function parsePdfText(text: string): PdfParseResult {
   const lines = text.split("\n");
@@ -300,38 +334,53 @@ export function parsePdfText(text: string): PdfParseResult {
   const errors: string[] = [];
   const seen = new Set<string>();
 
-  // Track the current YW class sub-header (e.g. "YW 12-14")
-  let currentYwClass: string | null = null;
+  // Track the current sub-header qualifier and its rule
+  let currentQualifier: string | null = null;
+  let currentRule: SubHeaderRule | null = null;
 
   for (const line of lines) {
     const trimmed = line.trim();
     if (shouldSkipLine(trimmed)) continue;
 
-    // Detect YW class sub-headers (e.g. "Young Women 15-18 Class Presidency")
-    const ywMatch = trimmed.match(YW_CLASS_HEADER);
-    if (ywMatch) {
-      currentYwClass = `YW ${ywMatch[1]}`; // Abbreviate to e.g. "YW 12-14"
-      continue;
+    // Detect sub-headers
+    let matchedSubHeader = false;
+    for (const rule of SUB_HEADER_RULES) {
+      const match = trimmed.match(rule.pattern);
+      if (match) {
+        const qualifier = rule.abbreviate(match);
+        if (!qualifier) {
+          // Empty qualifier means reset (e.g. "Unassigned Teachers")
+          currentQualifier = null;
+          currentRule = null;
+        } else {
+          currentQualifier = qualifier;
+          currentRule = rule;
+        }
+        matchedSubHeader = true;
+        break;
+      }
     }
+    if (matchedSubHeader) continue;
 
     const parsed = parseLine(line);
-    if (!parsed) {
-      // If a non-parseable, non-skipped line appears that doesn't look like a
-      // YW class header, reset the class context (we've left the YW section)
-      continue;
-    }
+    if (!parsed) continue;
 
     const { org, position } = classifyCalling(parsed.callingName);
 
-    // Reset YW class context when we leave the Young Women org
-    if (org !== "Young Women") {
-      currentYwClass = null;
+    // Reset sub-header context when we leave the relevant org
+    if (currentRule && org !== currentRule.org) {
+      currentQualifier = null;
+      currentRule = null;
     }
 
-    // Qualify class positions with the age range
+    // Qualify positions with the sub-header prefix
     let qualifiedPosition = position;
-    if (org === "Young Women" && currentYwClass && isYwClassPosition(position)) {
-      qualifiedPosition = `${currentYwClass} ${position}`;
+    if (currentQualifier && currentRule && org === currentRule.org) {
+      const shouldQualify = currentRule.positions === null
+        || currentRule.positions.some((p) => position.toLowerCase() === p);
+      if (shouldQualify) {
+        qualifiedPosition = `${currentQualifier} ${position}`;
+      }
     }
 
     // Deduplicate (PDF repeats Bishopric entries for Priests Quorum)
