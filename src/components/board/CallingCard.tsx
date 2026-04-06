@@ -81,12 +81,16 @@ export function CallingCard({ item, isDragOverlay, proposals }: Props) {
 }
 
 function ProposalLine({ proposal }: { proposal: CallingProposal }) {
+  const isRelease = proposal.type === "release";
+  const pillColor = isRelease ? "bg-vacant/15 text-vacant" : "bg-success/15 text-success";
+  const textColor = isRelease ? "text-vacant" : "text-success";
+
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-warning/15 text-warning flex-shrink-0">
+      <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${pillColor} flex-shrink-0`}>
         {STATUS_LABEL[proposal.status] ?? proposal.status}
       </span>
-      <span className="text-xs text-warning flex-1 truncate">
+      <span className={`text-xs ${textColor} flex-1 truncate`}>
         {proposal.type === "release" && `Release ${proposal.fromMemberName ?? ""}`}
         {proposal.type === "assign" && `Assign ${proposal.toMemberName ?? ""}`}
         {proposal.type === "move" && `Move ${proposal.toMemberName ?? ""}`}

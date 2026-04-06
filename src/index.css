@@ -61,3 +61,12 @@
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 }
+
+/* Hide the native horizontal scrollbar while keeping scroll functionality */
+.scrollbar-hide-x {
+  scrollbar-width: none; /* Firefox */
+}
+.scrollbar-hide-x::-webkit-scrollbar {
+  height: 0;
+  display: none; /* Chrome, Safari, Edge */
+}

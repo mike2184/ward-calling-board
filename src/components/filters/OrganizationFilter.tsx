@@ -55,7 +55,7 @@ export function OrganizationFilter({
                 className={`text-xs px-1.5 py-0.5 rounded-full ${
                   selected.has(org.id)
                     ? "bg-primary-foreground/20 text-primary-foreground"
-                    : "bg-vacant/10 text-vacant"
+                    : "bg-muted-foreground/10 text-muted-foreground"
                 }`}
               >
                 {org.vacant}

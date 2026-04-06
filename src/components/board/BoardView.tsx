@@ -66,8 +66,30 @@ export function BoardView({
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollbarRef = useRef<HTMLDivElement>(null);
   const [contentWidth, setContentWidth] = useState(0);
+  const [availableHeight, setAvailableHeight] = useState(0);
   const syncing = useRef(false);
   const observerRef = useRef<ResizeObserver | null>(null);
+  const contentHeightObserverRef = useRef<ResizeObserver | null>(null);
+
+  // Track available height of the scroll container
+  const contentContainerRef = useCallback((node: HTMLDivElement | null) => {
+    if (contentHeightObserverRef.current) {
+      contentHeightObserverRef.current.disconnect();
+      contentHeightObserverRef.current = null;
+    }
+    // Also set contentRef
+    (contentRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+    if (node) {
+      const observer = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setAvailableHeight(entry.contentRect.height);
+        }
+      });
+      observer.observe(node);
+      contentHeightObserverRef.current = observer;
+      setAvailableHeight(node.clientHeight);
+    }
+  }, []);
 
   const syncScroll = useCallback((source: "content" | "scrollbar") => {
     if (syncing.current) return;
@@ -99,9 +121,12 @@ export function BoardView({
     }
   }, []);
 
-  // Clean up observer on unmount
+  // Clean up observers on unmount
   useEffect(() => {
-    return () => observerRef.current?.disconnect();
+    return () => {
+      observerRef.current?.disconnect();
+      contentHeightObserverRef.current?.disconnect();
+    };
   }, []);
 
   const sensors = useSensors(
@@ -318,13 +343,13 @@ export function BoardView({
                 </span>
               </div>
 
-              {/* Vertical scroll area — all columns scroll together */}
+              {/* Horizontal scroll area — columns expand horizontally */}
               <div
-                ref={contentRef}
-                className="flex-1 overflow-y-auto overflow-x-hidden px-6"
+                ref={contentContainerRef}
+                className="flex-1 overflow-y-hidden overflow-x-auto scrollbar-hide-x px-6"
                 onScroll={() => syncScroll("content")}
               >
-                <div ref={innerRef} className="flex gap-3 w-max pb-4">
+                <div ref={innerRef} className="flex gap-3 w-max h-full items-start pb-4">
                   {Array.from(grouped.entries()).map(([orgId, items]) => (
                     <OrganizationColumn
                       key={orgId}
@@ -332,6 +357,7 @@ export function BoardView({
                       callings={items}
                       activeDropId={activeDropId}
                       proposalMap={proposalMap}
+                      maxHeight={availableHeight}
                     />
                   ))}
                 </div>

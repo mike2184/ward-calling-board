@@ -8,13 +8,24 @@ interface Props {
   callings: CallingWithDetails[];
   activeDropId: string | null;
   proposalMap?: Map<string, CallingProposal[]>;
+  maxHeight?: number;
 }
+
+// Card column width (px) — matches w-60 (240px)
+const CARD_WIDTH = 240;
+// Gap between cards
+const CARD_GAP = 8;
+// Header height (px)
+const HEADER_HEIGHT = 44;
+// Padding inside the cards area
+const CARDS_PADDING = 8;
 
 export function OrganizationColumn({
   orgName,
   callings,
   activeDropId,
   proposalMap,
+  maxHeight,
 }: Props) {
   const filledCount = callings.filter(
     (c) => c.calling.status === "active"
@@ -23,47 +34,61 @@ export function OrganizationColumn({
     (c) => c.calling.status === "vacant"
   ).length;
 
+  // Calculate the available height for the cards area
+  const cardsMaxHeight = maxHeight
+    ? maxHeight - HEADER_HEIGHT - CARDS_PADDING * 2
+    : undefined;
+
   return (
-    <div className="w-64 flex-shrink-0 bg-muted/30 rounded-lg border">
+    <div className="flex-shrink-0 flex flex-col" style={maxHeight ? { maxHeight } : undefined}>
       {/* Column header */}
-      <div className="px-3 py-2.5 border-b bg-muted/50 rounded-t-lg">
+      <div className="px-3 py-2.5 border-b bg-muted/50 rounded-t-lg border border-b-0 rounded-b-none">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm">{orgName}</h3>
           <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-success">{filledCount}</span>
+            <span className="text-muted-foreground">{filledCount}</span>
             <span className="text-muted-foreground">/</span>
-            <span className={vacantCount > 0 ? "text-vacant" : "text-muted-foreground"}>
+            <span className="text-muted-foreground">
               {filledCount + vacantCount}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Callings list */}
-      <div className="p-2 space-y-2">
+      {/* Callings list — flex column wrap so the container grows horizontally */}
+      <div
+        className="flex flex-col flex-wrap content-start bg-muted/30 border rounded-b-lg border-t-0"
+        style={{
+          gap: `${CARD_GAP}px`,
+          padding: `${CARDS_PADDING}px`,
+          ...(cardsMaxHeight ? { maxHeight: cardsMaxHeight } : {}),
+        }}
+      >
         {callings.map((item) => {
           const proposals = proposalMap?.get(item.calling.id);
           if (item.calling.status === "vacant") {
             return (
-              <DroppableVacantSlot
-                key={item.calling.id}
+              <div key={item.calling.id} style={{ width: CARD_WIDTH }}>
+                <DroppableVacantSlot
+                  item={item}
+                  isOver={activeDropId === item.calling.id}
+                  proposals={proposals}
+                />
+              </div>
+            );
+          }
+          return (
+            <div key={item.calling.id} style={{ width: CARD_WIDTH }}>
+              <DroppableFilledSlot
                 item={item}
                 isOver={activeDropId === item.calling.id}
                 proposals={proposals}
               />
-            );
-          }
-          return (
-            <DroppableFilledSlot
-              key={item.calling.id}
-              item={item}
-              isOver={activeDropId === item.calling.id}
-              proposals={proposals}
-            />
+            </div>
           );
         })}
         {callings.length === 0 && (
-          <div className="text-xs text-muted-foreground text-center py-4 italic">
+          <div className="text-xs text-muted-foreground text-center py-4 italic" style={{ width: CARD_WIDTH }}>
             No callings
           </div>
         )}

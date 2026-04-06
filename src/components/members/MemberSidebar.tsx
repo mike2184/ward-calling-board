@@ -74,9 +74,9 @@ export function MemberSidebar({ isBoardView }: Props) {
   const [expandedSection, setExpandedSection] = useState<string | null>(
     "unassigned"
   );
-  const [ageFilter, setAgeFilter] = useState<AgeFilter>("all");
+  const [ageFilter, setAgeFilter] = useState<AgeFilter>("adults");
   const [genderFilter, setGenderFilter] = useState<GenderFilter>("all");
-  const [sortBy, setSortBy] = useState<SortOption>("name");
+  const [sortBy, setSortBy] = useState<SortOption>("age-asc");
 
   const unassigned = useUnassignedMembers();
   const multiCalling = useMultiCallingMembers();
