@@ -8,7 +8,8 @@ import {
   deleteProposal,
   type ProposalWithDetails,
 } from "@/hooks/useProposals";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { format } from "date-fns";
 
 interface Props {
   onClose: () => void;
@@ -189,6 +190,161 @@ function ProposalCard({
   );
 }
 
+function SustainingReport({
+  releases,
+  assignments,
+  onClose,
+}: {
+  releases: ProposalWithDetails[];
+  assignments: ProposalWithDetails[];
+  onClose: () => void;
+}) {
+  const today = format(new Date(), "MMMM d, yyyy");
+
+  // Position sort order — presidency positions first in canonical order
+  const POSITION_ORDER: string[] = [
+    "bishop",
+    "president",
+    "1st counselor",
+    "first counselor",
+    "2nd counselor",
+    "second counselor",
+    "secretary",
+    "executive secretary",
+    "assistant secretary",
+    "1st assistant",
+    "2nd assistant",
+    "adviser",
+    "teacher",
+    "specialist",
+  ];
+
+  function positionSortKey(positionName: string | undefined): number {
+    if (!positionName) return 999;
+    const lower = positionName.toLowerCase();
+    for (let i = 0; i < POSITION_ORDER.length; i++) {
+      if (lower.includes(POSITION_ORDER[i])) return i;
+    }
+    return 999;
+  }
+
+  function sortByPosition(items: ProposalWithDetails[]): ProposalWithDetails[] {
+    return [...items].sort((a, b) => positionSortKey(a.positionName) - positionSortKey(b.positionName));
+  }
+
+  // Group by organization, sorted by position
+  const releasesByOrg = useMemo(() => {
+    const map = new Map<string, ProposalWithDetails[]>();
+    for (const p of releases) {
+      const org = p.organizationName ?? "Other";
+      if (!map.has(org)) map.set(org, []);
+      map.get(org)!.push(p);
+    }
+    for (const [org, items] of map) {
+      map.set(org, sortByPosition(items));
+    }
+    return map;
+  }, [releases]);
+
+  const assignmentsByOrg = useMemo(() => {
+    const map = new Map<string, ProposalWithDetails[]>();
+    for (const p of assignments) {
+      const org = p.organizationName ?? "Other";
+      if (!map.has(org)) map.set(org, []);
+      map.get(org)!.push(p);
+    }
+    for (const [org, items] of map) {
+      map.set(org, sortByPosition(items));
+    }
+    return map;
+  }, [assignments]);
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-background flex flex-col print:static">
+      {/* Screen-only header bar */}
+      <div className="flex items-center justify-between px-8 py-4 border-b print:hidden">
+        <h2 className="text-lg font-semibold">Sustaining Report</h2>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => window.print()}
+            className="text-sm px-4 py-2 rounded bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
+          >
+            Print
+          </button>
+          <button
+            onClick={onClose}
+            className="text-sm px-4 py-2 rounded border font-medium hover:bg-muted transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+
+      {/* Printable report content */}
+      <div className="flex-1 overflow-auto">
+        <div className="max-w-2xl mx-auto px-8 py-10 print:max-w-none print:px-0 print:py-0">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold">Sustaining Report</h1>
+            <p className="text-muted-foreground mt-1 print:text-gray-500">{today}</p>
+          </div>
+
+          {releases.length > 0 && (
+            <section className="mb-8">
+              <h2 className="text-lg font-semibold border-b pb-2 mb-4">Releases</h2>
+              {Array.from(releasesByOrg.entries()).map(([org, items]) => (
+                <div key={org} className="mb-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2 print:text-gray-600">
+                    {org}
+                  </h3>
+                  <ul className="space-y-1.5 ml-1">
+                    {items.map((p) => (
+                      <li key={p.id} className="text-sm">
+                        <span className="font-medium">{p.fromMemberName}</span>
+                        <span className="text-muted-foreground print:text-gray-500">
+                          {" "}&mdash; {p.positionName}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </section>
+          )}
+
+          {assignments.length > 0 && (
+            <section className="mb-8">
+              <h2 className="text-lg font-semibold border-b pb-2 mb-4">New Callings</h2>
+              {Array.from(assignmentsByOrg.entries()).map(([org, items]) => (
+                <div key={org} className="mb-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2 print:text-gray-600">
+                    {org}
+                  </h3>
+                  <ul className="space-y-1.5 ml-1">
+                    {items.map((p) => (
+                      <li key={p.id} className="text-sm">
+                        <span className="font-medium">{p.toMemberName}</span>
+                        <span className="text-muted-foreground print:text-gray-500">
+                          {" "}&mdash; {p.positionName}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </section>
+          )}
+
+          {releases.length === 0 && assignments.length === 0 && (
+            <p className="text-center text-muted-foreground py-12">
+              No proposed changes to report.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ProposedChangesList({ onClose }: Props) {
   const proposals = useProposals();
   const [showReport, setShowReport] = useState(false);
@@ -210,117 +366,79 @@ export function ProposedChangesList({ onClose }: Props) {
   const assignments = proposals.filter((p) => (p.type === "assign" || p.type === "move") && p.status !== "applied");
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex justify-end z-50">
-      <div className="bg-background w-full max-w-md h-full flex flex-col shadow-xl">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b">
-          <div>
-            <h2 className="text-lg font-semibold">Proposed Changes</h2>
-            <p className="text-xs text-muted-foreground">
-              {proposals.length} pending
-              {approvedCount > 0 && ` · ${approvedCount} ready to apply`}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground text-xl leading-none"
-          >
-            &times;
-          </button>
-        </div>
+    <>
+      {showReport && (
+        <SustainingReport
+          releases={releases}
+          assignments={assignments}
+          onClose={() => setShowReport(false)}
+        />
+      )}
 
-        {/* Actions bar */}
-        {proposals.length > 0 && (
-          <div className="flex items-center gap-2 px-5 py-2 border-b">
-            {approvedCount > 0 && (
-              <button
-                onClick={handleApplyAll}
-                className="text-xs px-3 py-1.5 rounded bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
-              >
-                Apply All Approved ({approvedCount})
-              </button>
-            )}
-            <button
-              onClick={() => setShowReport(!showReport)}
-              className="text-xs px-3 py-1.5 rounded border font-medium hover:bg-muted transition-colors"
-            >
-              {showReport ? "Hide Report" : "Sustaining Report"}
-            </button>
-            <button
-              onClick={async () => {
-                for (const p of proposals) {
-                  await deleteProposal(p.id);
-                }
-              }}
-              className="text-xs px-3 py-1.5 rounded border font-medium text-destructive hover:bg-destructive/10 transition-colors ml-auto"
-            >
-              Remove All
-            </button>
-          </div>
-        )}
-
-        {/* Sustaining Report */}
-        {showReport && (releases.length > 0 || assignments.length > 0) && (
-          <div className="px-5 py-3 border-b bg-muted/30 text-sm space-y-3 print:bg-white">
-            <h3 className="font-semibold">Sustaining Report (Approved)</h3>
-
-            {releases.length > 0 && (
-              <div>
-                <h4 className="font-medium text-xs uppercase text-muted-foreground mb-1">
-                  Releases
-                </h4>
-                {releases.map((p) => (
-                  <div key={p.id} className="py-0.5">
-                    <span className="font-medium">{p.fromMemberName}</span>
-                    <span className="text-muted-foreground">
-                      {" "}as {p.positionName}
-                      {p.organizationName && `, ${p.organizationName}`}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {assignments.length > 0 && (
-              <div>
-                <h4 className="font-medium text-xs uppercase text-muted-foreground mb-1">
-                  New Callings
-                </h4>
-                {assignments.map((p) => (
-                  <div key={p.id} className="py-0.5">
-                    <span className="font-medium">{p.toMemberName}</span>
-                    <span className="text-muted-foreground">
-                      {" "}as {p.positionName}
-                      {p.organizationName && `, ${p.organizationName}`}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <button
-              onClick={() => window.print()}
-              className="text-xs px-3 py-1.5 rounded border font-medium hover:bg-muted transition-colors mt-2"
-            >
-              Print Report
-            </button>
-          </div>
-        )}
-
-        {/* Proposals list */}
-        <div className="flex-1 overflow-auto p-5 space-y-3">
-          {proposals.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground text-sm">
-              <p>No proposed changes yet.</p>
-              <p className="mt-1 text-xs">
-                Drag members onto vacant slots in the board view to create proposals.
+      <div className="fixed inset-0 bg-black/50 flex justify-end z-50">
+        <div className="bg-background w-full max-w-md h-full flex flex-col shadow-xl">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b">
+            <div>
+              <h2 className="text-lg font-semibold">Proposed Changes</h2>
+              <p className="text-xs text-muted-foreground">
+                {proposals.length} pending
+                {approvedCount > 0 && ` · ${approvedCount} ready to apply`}
               </p>
             </div>
-          ) : (
-            proposals.map((p) => <ProposalCard key={p.id} proposal={p} />)
+            <button
+              onClick={onClose}
+              className="text-muted-foreground hover:text-foreground text-xl leading-none"
+            >
+              &times;
+            </button>
+          </div>
+
+          {/* Actions bar */}
+          {proposals.length > 0 && (
+            <div className="flex items-center gap-2 px-5 py-2 border-b">
+              {approvedCount > 0 && (
+                <button
+                  onClick={handleApplyAll}
+                  className="text-xs px-3 py-1.5 rounded bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
+                >
+                  Apply All Approved ({approvedCount})
+                </button>
+              )}
+              <button
+                onClick={() => setShowReport(true)}
+                className="text-xs px-3 py-1.5 rounded border font-medium hover:bg-muted transition-colors"
+              >
+                Sustaining Report
+              </button>
+              <button
+                onClick={async () => {
+                  for (const p of proposals) {
+                    await deleteProposal(p.id);
+                  }
+                }}
+                className="text-xs px-3 py-1.5 rounded border font-medium text-destructive hover:bg-destructive/10 transition-colors ml-auto"
+              >
+                Remove All
+              </button>
+            </div>
           )}
+
+          {/* Proposals list */}
+          <div className="flex-1 overflow-auto p-5 space-y-3">
+            {proposals.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground text-sm">
+                <p>No proposed changes yet.</p>
+                <p className="mt-1 text-xs">
+                  Drag members onto vacant slots in the board view to create proposals.
+                </p>
+              </div>
+            ) : (
+              proposals.map((p) => <ProposalCard key={p.id} proposal={p} />)
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
