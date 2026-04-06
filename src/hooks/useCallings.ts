@@ -71,18 +71,36 @@ export function useOrganizationsWithCounts() {
     const organizations = await db.organizations.orderBy("sortOrder").toArray();
     const positions = await db.callingPositions.toArray();
     const callings = await db.callings.toArray();
+    const proposals = await db.proposedChanges
+      .where("status")
+      .anyOf(["draft", "pending_approval", "approved"])
+      .toArray();
+
+    // Map callingId → organizationId for proposal counting
+    const callingMap = new Map(callings.map((c) => [c.id, c]));
+    const positionMap = new Map(positions.map((p) => [p.id, p]));
 
     return organizations.map((org) => {
       const orgPositions = positions.filter(
         (p) => p.organizationId === org.id
       );
+      const orgPositionIds = new Set(orgPositions.map((p) => p.id));
       const orgCallings = callings.filter((c) =>
-        orgPositions.some((p) => p.id === c.positionId)
+        orgPositionIds.has(c.positionId)
       );
       const vacant = orgCallings.filter((c) => c.status === "vacant").length;
       const filled = orgCallings.filter((c) => c.status === "active").length;
 
-      return { ...org, totalCallings: orgCallings.length, vacant, filled };
+      // Count proposals for this org
+      const proposalCount = proposals.filter((p) => {
+        if (!p.callingId) return false;
+        const calling = callingMap.get(p.callingId);
+        if (!calling) return false;
+        const pos = positionMap.get(calling.positionId);
+        return pos?.organizationId === org.id;
+      }).length;
+
+      return { ...org, totalCallings: orgCallings.length, vacant, filled, proposalCount };
     });
   });
 }

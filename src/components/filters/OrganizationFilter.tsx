@@ -61,6 +61,17 @@ export function OrganizationFilter({
                 {org.vacant}
               </span>
             )}
+            {org.proposalCount > 0 && (
+              <span
+                className={`text-xs px-1.5 py-0.5 rounded-full ${
+                  selected.has(org.id)
+                    ? "bg-vacant/80 text-white"
+                    : "bg-vacant/10 text-vacant"
+                }`}
+              >
+                {org.proposalCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
