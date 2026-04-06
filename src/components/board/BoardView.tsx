@@ -312,6 +312,9 @@ export function BoardView({
       onDragEnd={handleDragEnd}
     >
       <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <MemberSidebar isBoardView />
+
         {/* Board area */}
         <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
           {!callings ? (
@@ -374,9 +377,6 @@ export function BoardView({
             </>
           )}
         </main>
-
-        {/* Sidebar */}
-        <MemberSidebar isBoardView />
       </div>
 
       {/* Drag overlay */}
