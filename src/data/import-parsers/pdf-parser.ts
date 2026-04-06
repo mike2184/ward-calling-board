@@ -273,28 +273,75 @@ export interface PdfParseResult {
 /**
  * Parses extracted text from an LCR Organizations and Callings PDF.
  */
+// Regex to detect YW class sub-headers like "Young Women 15-18 Class Presidency",
+// "Young Women 12-14 Class Adult Leaders", etc. Captures the age range.
+const YW_CLASS_HEADER = /^Young Women\s+(\d+-\d+)\s+Class/;
+
+// Class-level position prefixes that should be qualified with the age range
+const YW_CLASS_POSITIONS = [
+  "Class President",
+  "Class 1st Counselor",
+  "Class 2nd Counselor",
+  "Class First Counselor",
+  "Class Second Counselor",
+  "Class Secretary",
+  "Class Adviser",
+];
+
+function isYwClassPosition(position: string): boolean {
+  return YW_CLASS_POSITIONS.some(
+    (p) => position.toLowerCase() === p.toLowerCase()
+  );
+}
+
 export function parsePdfText(text: string): PdfParseResult {
   const lines = text.split("\n");
   const callings: ParsedCalling[] = [];
   const errors: string[] = [];
   const seen = new Set<string>();
 
+  // Track the current YW class sub-header (e.g. "YW 12-14")
+  let currentYwClass: string | null = null;
+
   for (const line of lines) {
-    if (shouldSkipLine(line.trim())) continue;
+    const trimmed = line.trim();
+    if (shouldSkipLine(trimmed)) continue;
+
+    // Detect YW class sub-headers (e.g. "Young Women 15-18 Class Presidency")
+    const ywMatch = trimmed.match(YW_CLASS_HEADER);
+    if (ywMatch) {
+      currentYwClass = `YW ${ywMatch[1]}`; // Abbreviate to e.g. "YW 12-14"
+      continue;
+    }
 
     const parsed = parseLine(line);
-    if (!parsed) continue;
+    if (!parsed) {
+      // If a non-parseable, non-skipped line appears that doesn't look like a
+      // YW class header, reset the class context (we've left the YW section)
+      continue;
+    }
 
     const { org, position } = classifyCalling(parsed.callingName);
 
+    // Reset YW class context when we leave the Young Women org
+    if (org !== "Young Women") {
+      currentYwClass = null;
+    }
+
+    // Qualify class positions with the age range
+    let qualifiedPosition = position;
+    if (org === "Young Women" && currentYwClass && isYwClassPosition(position)) {
+      qualifiedPosition = `${currentYwClass} ${position}`;
+    }
+
     // Deduplicate (PDF repeats Bishopric entries for Priests Quorum)
-    const key = `${org}|${position}|${parsed.memberFullName ?? "vacant"}`;
+    const key = `${org}|${qualifiedPosition}|${parsed.memberFullName ?? "vacant"}`;
     if (seen.has(key)) continue;
     seen.add(key);
 
     callings.push({
       organizationName: org,
-      positionName: position,
+      positionName: qualifiedPosition,
       memberFirstName: parsed.memberFirstName ?? undefined,
       memberLastName: parsed.memberLastName ?? undefined,
       memberFullName: parsed.memberFullName ?? undefined,

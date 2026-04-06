@@ -218,51 +218,53 @@ export async function importMembers(
   const errors: string[] = [];
   let imported = 0;
 
-  const existingMembers = await db.members.toArray();
-  const memberNameMap = new Map<string, string>();
-  for (const m of existingMembers) {
-    memberNameMap.set(m.fullName.toLowerCase(), m.id);
-  }
-
-  for (const parsed of parsedMembers) {
-    try {
-      const fullName = parsed.fullName || `${parsed.firstName} ${parsed.lastName}`.trim();
-      const existingId = memberNameMap.get(fullName.toLowerCase());
-
-      if (existingId) {
-        // Update existing member with any new data
-        const updates: Record<string, unknown> = {};
-        if (parsed.gender) updates.gender = parsed.gender;
-        if (parsed.age != null) updates.age = parsed.age;
-        if (parsed.phone) updates.phone = parsed.phone;
-        if (parsed.email) updates.email = parsed.email;
-        if (Object.keys(updates).length > 0) {
-          await db.members.update(existingId, updates);
-          imported++;
-        }
-        continue;
-      }
-
-      const id = generateId();
-      await db.members.add({
-        id,
-        firstName: parsed.firstName,
-        lastName: parsed.lastName,
-        fullName,
-        gender: parsed.gender,
-        age: parsed.age,
-        email: parsed.email,
-        phone: parsed.phone,
-        priesthoodOffice: parsed.priesthoodOffice,
-      });
-      memberNameMap.set(fullName.toLowerCase(), id);
-      imported++;
-    } catch (e) {
-      errors.push(
-        `Error importing member "${parsed.fullName}": ${e instanceof Error ? e.message : String(e)}`
-      );
+  await db.transaction("rw", [db.members], async () => {
+    const existingMembers = await db.members.toArray();
+    const memberNameMap = new Map<string, string>();
+    for (const m of existingMembers) {
+      memberNameMap.set(m.fullName.toLowerCase(), m.id);
     }
-  }
+
+    for (const parsed of parsedMembers) {
+      try {
+        const fullName = parsed.fullName || `${parsed.firstName} ${parsed.lastName}`.trim();
+        const existingId = memberNameMap.get(fullName.toLowerCase());
+
+        if (existingId) {
+          // Update existing member with any new data
+          const updates: Record<string, unknown> = {};
+          if (parsed.gender) updates.gender = parsed.gender;
+          if (parsed.age != null) updates.age = parsed.age;
+          if (parsed.phone) updates.phone = parsed.phone;
+          if (parsed.email) updates.email = parsed.email;
+          if (Object.keys(updates).length > 0) {
+            await db.members.update(existingId, updates);
+            imported++;
+          }
+          continue;
+        }
+
+        const id = generateId();
+        await db.members.add({
+          id,
+          firstName: parsed.firstName,
+          lastName: parsed.lastName,
+          fullName,
+          gender: parsed.gender,
+          age: parsed.age,
+          email: parsed.email,
+          phone: parsed.phone,
+          priesthoodOffice: parsed.priesthoodOffice,
+        });
+        memberNameMap.set(fullName.toLowerCase(), id);
+        imported++;
+      } catch (e) {
+        errors.push(
+          `Error importing member "${parsed.fullName}": ${e instanceof Error ? e.message : String(e)}`
+        );
+      }
+    }
+  });
 
   return { imported, errors };
 }
