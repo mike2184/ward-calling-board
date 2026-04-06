@@ -110,7 +110,7 @@ function App() {
           >
             Changes
             {(proposalCount ?? 0) > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 bg-vacant text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                 {proposalCount}
               </span>
             )}
