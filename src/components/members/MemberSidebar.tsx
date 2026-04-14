@@ -1,15 +1,16 @@
 import {
-  useUnassignedMembers,
-  useMultiCallingMembers,
   useMembersWithCallingInfo,
+  updateMemberActivityStatus,
   type MemberWithCallingInfo,
 } from "@/hooks/useMembers";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { DraggableMemberCard } from "./DraggableMemberCard";
-import type { Member } from "@/types/models";
+import type { Member, ActivityStatus } from "@/types/models";
 
 type AgeFilter = "all" | "children" | "youth" | "adults";
 type GenderFilter = "all" | "M" | "F";
+type ActivityFilter = "all" | "active" | "less-active" | "inactive" | "serving-away";
 type SortOption = "name" | "age-asc" | "age-desc";
 
 interface Props {
@@ -26,6 +27,12 @@ function ageFilterLabel(filter: AgeFilter): string {
 function matchesGenderFilter(member: { gender?: "M" | "F" }, filter: GenderFilter): boolean {
   if (filter === "all") return true;
   return member.gender === filter;
+}
+
+function matchesActivityFilter(member: { activityStatus?: ActivityStatus }, filter: ActivityFilter): boolean {
+  if (filter === "all") return true;
+  const status = member.activityStatus ?? "active";
+  return status === filter;
 }
 
 function matchesAgeFilter(member: { age?: number }, filter: AgeFilter): boolean {
@@ -53,18 +60,187 @@ function sortMembers<T extends { fullName: string; lastName: string; age?: numbe
   return sorted;
 }
 
-function MemberRow({ member, callingInfo }: { member: Member & { age?: number }; callingInfo?: string }) {
+const ACTIVITY_STATUS_COLORS: Record<string, string> = {
+  active: "bg-green-500",
+  "less-active": "bg-yellow-500",
+  inactive: "bg-red-500",
+  "serving-away": "bg-blue-500",
+};
+
+const ACTIVITY_STATUS_LABELS: Record<string, string> = {
+  active: "Active",
+  "less-active": "Less Active",
+  inactive: "Inactive",
+  "serving-away": "Serving Away",
+};
+
+function ActivityStatusDot({ member }: { member: Member }) {
+  const [open, setOpen] = useState(false);
+  const dotRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const status = member.activityStatus ?? "active";
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        menuRef.current && !menuRef.current.contains(e.target as Node) &&
+        dotRef.current && !dotRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!open && dotRef.current) {
+      const rect = dotRef.current.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 4, left: rect.left });
+    }
+    setOpen(!open);
+  };
+
   return (
-    <div className="text-sm py-1 px-2 rounded hover:bg-muted/50 cursor-default">
-      <div className="flex items-center justify-between">
-        <span>{member.fullName}</span>
-        {member.age != null && (
-          <span className="text-[10px] text-muted-foreground">{member.age}</span>
-        )}
-      </div>
-      {callingInfo && (
-        <div className="text-xs text-muted-foreground truncate">{callingInfo}</div>
+    <>
+      <button
+        ref={dotRef}
+        onClick={handleClick}
+        className={`w-2 h-2 rounded-full ${ACTIVITY_STATUS_COLORS[status]} hover:ring-2 hover:ring-ring transition-all flex-shrink-0`}
+        title={`Activity: ${ACTIVITY_STATUS_LABELS[status]}`}
+      />
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-[9999] bg-popover border rounded-md shadow-md py-1 min-w-[120px]"
+          style={{ top: menuPos.top, left: menuPos.left }}
+        >
+          {(["active", "less-active", "inactive", "serving-away"] as ActivityStatus[]).map((s) => (
+            <button
+              key={s}
+              onClick={(e) => {
+                e.stopPropagation();
+                updateMemberActivityStatus(member.id, s === "active" ? undefined : s);
+                setOpen(false);
+              }}
+              className={`w-full text-left px-3 py-1 text-xs hover:bg-muted flex items-center gap-2 ${
+                status === s ? "font-semibold" : ""
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${ACTIVITY_STATUS_COLORS[s]}`} />
+              {ACTIVITY_STATUS_LABELS[s]}
+            </button>
+          ))}
+        </div>,
+        document.body
       )}
+    </>
+  );
+}
+
+function CallingCountPill({ count, callingNames }: { count: number; callingNames: string[] }) {
+  const [open, setOpen] = useState(false);
+  const pillRef = useRef<HTMLButtonElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        popupRef.current && !popupRef.current.contains(e.target as Node) &&
+        pillRef.current && !pillRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!open && pillRef.current) {
+      const rect = pillRef.current.getBoundingClientRect();
+      // Position to the left of the pill, aligned with the top
+      setPos({ top: rect.top, left: rect.left - 4 });
+    }
+    setOpen(!open);
+  };
+
+  if (count === 0) return null;
+
+  return (
+    <>
+      <button
+        ref={pillRef}
+        onClick={handleClick}
+        className="text-[11px] font-medium bg-primary/10 text-primary px-1.5 py-0.5 rounded-full min-w-[20px] text-center hover:bg-primary/20 transition-colors flex-shrink-0"
+        title={`${count} calling${count !== 1 ? "s" : ""}`}
+      >
+        {count}
+      </button>
+      {open && createPortal(
+        <div
+          ref={popupRef}
+          className="fixed z-[9999] bg-popover border rounded-md shadow-lg py-2 px-3 max-w-[220px]"
+          style={{ top: pos.top + 28, left: Math.max(8, pos.left - 180) }}
+        >
+          <div className="text-xs font-medium text-muted-foreground mb-1">
+            {count} Calling{count !== 1 ? "s" : ""}
+          </div>
+          <ul className="space-y-1">
+            {callingNames.map((name, i) => (
+              <li key={i} className="text-xs text-foreground">{name}</li>
+            ))}
+          </ul>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+function MemberRow({ member, callingCount, callingNames, projected, projectedCallingCount }: {
+  member: Member & { age?: number };
+  callingCount?: number;
+  callingNames?: string[];
+  projected?: boolean;
+  /** When set, shows the projected count change (e.g. "2→3") */
+  projectedCallingCount?: number;
+}) {
+  const hasProjectedChange = projectedCallingCount != null && projectedCallingCount !== callingCount;
+  return (
+    <div className={`text-sm py-1 px-2 rounded cursor-default ${
+      projected
+        ? "bg-warning/8 border border-dashed border-warning/40 hover:bg-warning/15"
+        : "hover:bg-muted/50"
+    }`}>
+      <div className="flex items-center justify-between gap-1">
+        <span className="flex items-center gap-1.5 min-w-0">
+          <ActivityStatusDot member={member} />
+          <span className={`truncate ${projected ? "italic" : ""}`}>{member.fullName}</span>
+          {projected && (
+            <span className="text-[9px] text-warning font-medium flex-shrink-0">PROJ</span>
+          )}
+        </span>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {member.age != null && (
+            <span className="text-[10px] text-muted-foreground">{member.age}</span>
+          )}
+          {callingCount != null && callingCount > 0 && callingNames && (
+            <CallingCountPill count={callingCount} callingNames={callingNames} />
+          )}
+          {hasProjectedChange && (
+            <span className="text-[10px] text-warning font-medium" title={`Projected: ${projectedCallingCount} callings`}>
+              →{projectedCallingCount}
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -76,33 +252,71 @@ export function MemberSidebar({ isBoardView }: Props) {
   );
   const [ageFilter, setAgeFilter] = useState<AgeFilter>("adults");
   const [genderFilter, setGenderFilter] = useState<GenderFilter>("all");
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("age-asc");
 
-  const unassigned = useUnassignedMembers();
-  const multiCalling = useMultiCallingMembers();
   const allMembers = useMembersWithCallingInfo();
 
+  const matchesFilters = (m: { age?: number; gender?: "M" | "F"; activityStatus?: ActivityStatus }) =>
+    matchesAgeFilter(m, ageFilter) && matchesGenderFilter(m, genderFilter) && matchesActivityFilter(m, activityFilter);
+
+  // Derive all member groups from the single allMembers query (which includes projected counts)
+  const { currentUnassigned, projectedUnassigned, currentMulti, projectedMulti } = useMemo(() => {
+    if (!allMembers) return { currentUnassigned: [] as MemberWithCallingInfo[], projectedUnassigned: [] as MemberWithCallingInfo[], currentMulti: [] as MemberWithCallingInfo[], projectedMulti: [] as MemberWithCallingInfo[] };
+
+    const currentUnassigned: MemberWithCallingInfo[] = [];
+    const projectedUnassigned: MemberWithCallingInfo[] = [];
+    const currentMulti: MemberWithCallingInfo[] = [];
+    const projectedMulti: MemberWithCallingInfo[] = [];
+
+    for (const m of allMembers) {
+      const hasChange = m.projectedCallingCount !== m.callingCount;
+
+      if (m.callingCount === 0) {
+        // Currently unassigned
+        currentUnassigned.push(m);
+      } else if (hasChange && m.projectedCallingCount === 0) {
+        // Would become unassigned after proposals
+        projectedUnassigned.push(m);
+      }
+
+      if (m.callingCount >= 2) {
+        // Currently has multiple callings
+        currentMulti.push(m);
+      } else if (hasChange && m.projectedCallingCount >= 2) {
+        // Would have multiple callings after proposals
+        projectedMulti.push(m);
+      }
+    }
+
+    return { currentUnassigned, projectedUnassigned, currentMulti, projectedMulti };
+  }, [allMembers]);
+
   const filteredUnassigned = useMemo(() => {
-    if (!unassigned) return undefined;
-    let result = unassigned.filter((m) => matchesAgeFilter(m, ageFilter) && matchesGenderFilter(m, genderFilter));
-    return sortMembers(result, sortBy);
-  }, [unassigned, ageFilter, genderFilter, sortBy]);
+    return sortMembers(currentUnassigned.filter(matchesFilters), sortBy);
+  }, [currentUnassigned, ageFilter, genderFilter, activityFilter, sortBy]);
+
+  const filteredProjectedUnassigned = useMemo(() => {
+    return sortMembers(projectedUnassigned.filter(matchesFilters), sortBy);
+  }, [projectedUnassigned, ageFilter, genderFilter, activityFilter, sortBy]);
 
   const filteredMulti = useMemo(() => {
-    if (!multiCalling) return undefined;
-    let result = multiCalling.filter((m) => matchesAgeFilter(m, ageFilter) && matchesGenderFilter(m, genderFilter));
-    return sortMembers(result, sortBy);
-  }, [multiCalling, ageFilter, genderFilter, sortBy]);
+    return sortMembers(currentMulti.filter(matchesFilters), sortBy);
+  }, [currentMulti, ageFilter, genderFilter, activityFilter, sortBy]);
+
+  const filteredProjectedMulti = useMemo(() => {
+    return sortMembers(projectedMulti.filter(matchesFilters), sortBy);
+  }, [projectedMulti, ageFilter, genderFilter, activityFilter, sortBy]);
 
   const filteredMembers = useMemo(() => {
     if (!allMembers) return undefined;
-    let result: MemberWithCallingInfo[] = allMembers.filter((m) => matchesAgeFilter(m, ageFilter) && matchesGenderFilter(m, genderFilter));
+    let result: MemberWithCallingInfo[] = allMembers.filter(matchesFilters);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter((m) => m.fullName.toLowerCase().includes(q));
     }
     return sortMembers(result, sortBy);
-  }, [allMembers, ageFilter, genderFilter, sortBy, searchQuery]);
+  }, [allMembers, ageFilter, genderFilter, activityFilter, sortBy, searchQuery]);
 
   const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
@@ -150,6 +364,27 @@ export function MemberSidebar({ isBoardView }: Props) {
             </button>
           ))}
         </div>
+        <div className="flex gap-1">
+          {(["all", "active", "less-active", "inactive", "serving-away"] as ActivityFilter[]).map((f) => {
+            const label = { all: "All", active: "A", "less-active": "LA", inactive: "IA", "serving-away": "SA" }[f];
+            return (
+              <button
+                key={f}
+                onClick={() => setActivityFilter(f)}
+                className={`px-2 py-0.5 text-[11px] font-medium rounded-full transition-colors flex items-center gap-1 ${
+                  activityFilter === f
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                {f !== "all" && (
+                  <span className={`w-1.5 h-1.5 rounded-full ${ACTIVITY_STATUS_COLORS[f]}`} />
+                )}
+                {label}
+              </button>
+            );
+          })}
+        </div>
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortOption)}
@@ -172,24 +407,49 @@ export function MemberSidebar({ isBoardView }: Props) {
               <span className="w-2 h-2 rounded-full bg-warning" />
               No Calling
             </span>
-            <span className="text-muted-foreground text-xs">
-              {filteredUnassigned?.length ?? 0}
+            <span className="flex items-center gap-1 text-muted-foreground text-xs">
+              {filteredUnassigned.length}
+              {filteredProjectedUnassigned.length > 0 && (
+                <span className="text-warning italic">+{filteredProjectedUnassigned.length}</span>
+              )}
             </span>
           </button>
-          {expandedSection === "unassigned" && filteredUnassigned && (
+          {expandedSection === "unassigned" && (
             <div className="px-2 pb-2 space-y-0.5 overflow-auto flex-1">
-              {filteredUnassigned.length === 0 ? (
+              {filteredUnassigned.length === 0 && filteredProjectedUnassigned.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-2 px-2 italic">
                   {ageFilter === "all" ? "All members have callings" : "No matching members"}
                 </p>
-              ) : isBoardView ? (
-                filteredUnassigned.map((m) => (
-                  <DraggableMemberCard key={m.id} member={m} ageDisplay={m.age} />
-                ))
               ) : (
-                filteredUnassigned.map((m) => (
-                  <MemberRow key={m.id} member={m} />
-                ))
+                <>
+                  {isBoardView ? (
+                    filteredUnassigned.map((m) => (
+                      <DraggableMemberCard key={m.id} member={m} ageDisplay={m.age} />
+                    ))
+                  ) : (
+                    filteredUnassigned.map((m) => (
+                      <MemberRow key={m.id} member={m} />
+                    ))
+                  )}
+                  {filteredProjectedUnassigned.length > 0 && (
+                    <>
+                      {filteredUnassigned.length > 0 && (
+                        <div className="text-[10px] text-warning font-medium px-2 pt-2 pb-0.5 uppercase tracking-wide">
+                          After proposed changes
+                        </div>
+                      )}
+                      {isBoardView ? (
+                        filteredProjectedUnassigned.map((m) => (
+                          <DraggableMemberCard key={m.id} member={m} ageDisplay={m.age} projected />
+                        ))
+                      ) : (
+                        filteredProjectedUnassigned.map((m) => (
+                          <MemberRow key={m.id} member={m} projected />
+                        ))
+                      )}
+                    </>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -205,38 +465,49 @@ export function MemberSidebar({ isBoardView }: Props) {
               <span className="w-2 h-2 rounded-full bg-vacant" />
               Multiple Callings
             </span>
-            <span className="text-muted-foreground text-xs">
-              {filteredMulti?.length ?? 0}
+            <span className="flex items-center gap-1 text-muted-foreground text-xs">
+              {filteredMulti.length}
+              {filteredProjectedMulti.length > 0 && (
+                <span className="text-warning italic">+{filteredProjectedMulti.length}</span>
+              )}
             </span>
           </button>
-          {expandedSection === "multi" && filteredMulti && (
+          {expandedSection === "multi" && (
             <div className="px-2 pb-2 space-y-0.5 overflow-auto flex-1">
-              {filteredMulti.length === 0 ? (
+              {filteredMulti.length === 0 && filteredProjectedMulti.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-2 px-2 italic">
                   {ageFilter === "all" ? "No members with multiple callings" : "No matching members"}
                 </p>
               ) : (
-                filteredMulti.map((m) => (
-                  <div
-                    key={m.id}
-                    className="text-sm py-1 px-2 rounded hover:bg-muted/50"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>{m.fullName}</span>
-                      <div className="flex items-center gap-1.5">
-                        {m.age != null && (
-                          <span className="text-[10px] text-muted-foreground">{m.age}</span>
-                        )}
-                        <span className="text-xs bg-vacant/10 text-vacant px-1.5 py-0.5 rounded-full">
-                          {m.callingCount}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {m.callingNames.join(", ")}
-                    </div>
-                  </div>
-                ))
+                <>
+                  {filteredMulti.map((m) => (
+                    <MemberRow
+                      key={m.id}
+                      member={m}
+                      callingCount={m.callingCount}
+                      callingNames={m.callingNames}
+                      projectedCallingCount={m.projectedCallingCount !== m.callingCount ? m.projectedCallingCount : undefined}
+                    />
+                  ))}
+                  {filteredProjectedMulti.length > 0 && (
+                    <>
+                      {filteredMulti.length > 0 && (
+                        <div className="text-[10px] text-warning font-medium px-2 pt-2 pb-0.5 uppercase tracking-wide">
+                          After proposed changes
+                        </div>
+                      )}
+                      {filteredProjectedMulti.map((m) => (
+                        <MemberRow
+                          key={m.id}
+                          member={m}
+                          callingCount={m.callingCount}
+                          callingNames={m.callingNames}
+                          projected
+                        />
+                      ))}
+                    </>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -279,22 +550,16 @@ export function MemberSidebar({ isBoardView }: Props) {
                       key={m.id}
                       member={m}
                       ageDisplay={m.age}
-                      callingInfo={
-                        m.callingCount === 1
-                          ? m.callingNames[0]
-                          : m.callingCount > 1
-                            ? `${m.callingCount} callings`
-                            : undefined
-                      }
+                      callingCount={m.callingCount}
+                      callingNames={m.callingNames}
                     />
                   ) : (
-                    <MemberRow key={m.id} member={m} callingInfo={
-                      m.callingCount === 1
-                        ? m.callingNames[0]
-                        : m.callingCount > 1
-                          ? `${m.callingCount} callings`
-                          : undefined
-                    } />
+                    <MemberRow
+                      key={m.id}
+                      member={m}
+                      callingCount={m.callingCount}
+                      callingNames={m.callingNames}
+                    />
                   )
                 )}
               </div>

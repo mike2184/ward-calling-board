@@ -232,6 +232,7 @@ export async function importMembers(
 
         if (existingId) {
           // Update existing member with any new data
+          // Note: activityStatus is app-managed and never overwritten by imports
           const updates: Record<string, unknown> = {};
           if (parsed.gender) updates.gender = parsed.gender;
           if (parsed.age != null) updates.age = parsed.age;

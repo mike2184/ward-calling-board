@@ -26,4 +26,8 @@ db.version(1).stores({
   importSessions: "id, importedAt",
 });
 
+db.version(2).stores({
+  members: "id, lastName, fullName, activityStatus",
+});
+
 export { db };

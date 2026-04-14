@@ -1,10 +1,12 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@/data/db";
-import type { Member } from "@/types/models";
+import type { Member, ActivityStatus } from "@/types/models";
 
 export interface MemberWithCallingInfo extends Member {
   callingCount: number;
   callingNames: string[];
+  /** Projected calling count after all pending proposals are applied */
+  projectedCallingCount: number;
 }
 
 export function useMembers() {
@@ -17,9 +19,23 @@ export function useMembersWithCallingInfo() {
     const callings = await db.callings.toArray();
     const positions = await db.callingPositions.toArray();
     const organizations = await db.organizations.toArray();
+    const proposals = await db.proposedChanges
+      .where("status")
+      .anyOf(["draft", "pending_approval", "approved"])
+      .toArray();
 
     const posMap = new Map(positions.map((p) => [p.id, p]));
     const orgMap = new Map(organizations.map((o) => [o.id, o]));
+
+    // Compute proposal deltas per member
+    const proposalDeltas = new Map<string, number>();
+    for (const p of proposals) {
+      if (p.type === "release" && p.fromMemberId) {
+        proposalDeltas.set(p.fromMemberId, (proposalDeltas.get(p.fromMemberId) ?? 0) - 1);
+      } else if (p.type === "assign" && p.toMemberId) {
+        proposalDeltas.set(p.toMemberId, (proposalDeltas.get(p.toMemberId) ?? 0) + 1);
+      }
+    }
 
     return members.map((member): MemberWithCallingInfo => {
       const memberCallings = callings.filter(
@@ -34,10 +50,14 @@ export function useMembersWithCallingInfo() {
         })
         .sort();
 
+      const callingCount = memberCallings.length;
+      const delta = proposalDeltas.get(member.id) ?? 0;
+
       return {
         ...member,
-        callingCount: memberCallings.length,
+        callingCount,
         callingNames,
+        projectedCallingCount: Math.max(0, callingCount + delta),
       };
     });
   });
@@ -93,3 +113,11 @@ export function useMultiCallingMembers() {
     return result.sort((a, b) => a.lastName.localeCompare(b.lastName));
   });
 }
+
+export async function updateMemberActivityStatus(
+  memberId: string,
+  status: ActivityStatus | undefined
+) {
+  await db.members.update(memberId, { activityStatus: status });
+}
+

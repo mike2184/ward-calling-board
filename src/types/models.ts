@@ -1,3 +1,5 @@
+export type ActivityStatus = "active" | "less-active" | "inactive" | "serving-away";
+
 export interface Member {
   id: string;
   firstName: string;
@@ -10,6 +12,8 @@ export interface Member {
   priesthoodOffice?: string;
   moveInDate?: string;
   notes?: string;
+  /** App-managed field — not imported from LCR. Defaults to "active" when undefined. */
+  activityStatus?: ActivityStatus;
 }
 
 export interface Organization {
