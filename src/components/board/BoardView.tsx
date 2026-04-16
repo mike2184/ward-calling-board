@@ -42,6 +42,7 @@ interface PendingDrop {
 interface Props {
   organizationFilter: Set<string>;
   showVacantOnly: boolean;
+  hideVacant: boolean;
   showProposedOnly: boolean;
   searchQuery: string;
 }
@@ -53,6 +54,7 @@ type DragItem =
 export function BoardView({
   organizationFilter,
   showVacantOnly,
+  hideVacant,
   showProposedOnly,
   searchQuery,
 }: Props) {
@@ -141,6 +143,8 @@ export function BoardView({
     let filtered = callings;
     if (showVacantOnly) {
       filtered = filtered.filter((c) => c.calling.status === "vacant");
+    } else if (hideVacant) {
+      filtered = filtered.filter((c) => c.calling.status !== "vacant");
     }
     if (showProposedOnly) {
       filtered = filtered.filter((c) => {
@@ -165,7 +169,7 @@ export function BoardView({
       map.get(key)!.push(item);
     }
     return map;
-  }, [callings, showVacantOnly, showProposedOnly, searchQuery, proposalMap]);
+  }, [callings, showVacantOnly, hideVacant, showProposedOnly, searchQuery, proposalMap]);
 
   function handleDragStart(event: DragStartEvent) {
     const data = event.active.data.current;

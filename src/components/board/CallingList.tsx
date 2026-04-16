@@ -5,6 +5,7 @@ import { formatServingDurationShort } from "@/utils/time";
 interface Props {
   organizationFilter: Set<string>;
   showVacantOnly: boolean;
+  hideVacant: boolean;
   showProposedOnly: boolean;
   searchQuery: string;
 }
@@ -42,6 +43,7 @@ function CallingRow({ item }: { item: CallingWithDetails }) {
 export function CallingList({
   organizationFilter,
   showVacantOnly,
+  hideVacant,
   showProposedOnly,
   searchQuery,
 }: Props) {
@@ -60,6 +62,8 @@ export function CallingList({
 
   if (showVacantOnly) {
     filtered = filtered.filter((c) => c.calling.status === "vacant");
+  } else if (hideVacant) {
+    filtered = filtered.filter((c) => c.calling.status !== "vacant");
   }
 
   if (showProposedOnly) {

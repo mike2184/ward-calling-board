@@ -21,6 +21,7 @@ function App() {
   const [showDashboard, setShowDashboard] = useState(false);
   const [selectedOrgs, setSelectedOrgs] = useState<Set<string>>(new Set());
   const [showVacantOnly, setShowVacantOnly] = useState(false);
+  const [hideVacant, setHideVacant] = useState(true);
   const [showProposedOnly, setShowProposedOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -191,7 +192,9 @@ function App() {
           }
           onClear={() => setSelectedOrgs(new Set())}
           showVacantOnly={showVacantOnly}
-          onToggleVacant={() => setShowVacantOnly(!showVacantOnly)}
+          onToggleVacant={() => { setShowVacantOnly(!showVacantOnly); if (!showVacantOnly) setHideVacant(false); }}
+          hideVacant={hideVacant}
+          onToggleHideVacant={() => { setHideVacant(!hideVacant); if (!hideVacant) setShowVacantOnly(false); }}
           showProposedOnly={showProposedOnly}
           onToggleProposed={() => setShowProposedOnly(!showProposedOnly)}
           searchQuery={searchQuery}
@@ -204,6 +207,7 @@ function App() {
         <BoardView
           organizationFilter={selectedOrgs}
           showVacantOnly={showVacantOnly}
+          hideVacant={hideVacant}
           showProposedOnly={showProposedOnly}
           searchQuery={searchQuery}
         />
@@ -213,6 +217,7 @@ function App() {
             <CallingList
               organizationFilter={selectedOrgs}
               showVacantOnly={showVacantOnly}
+              hideVacant={hideVacant}
               showProposedOnly={showProposedOnly}
               searchQuery={searchQuery}
             />

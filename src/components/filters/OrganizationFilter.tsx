@@ -6,6 +6,8 @@ interface Props {
   onClear: () => void;
   showVacantOnly: boolean;
   onToggleVacant: () => void;
+  hideVacant: boolean;
+  onToggleHideVacant: () => void;
   showProposedOnly: boolean;
   onToggleProposed: () => void;
   searchQuery: string;
@@ -18,6 +20,8 @@ export function OrganizationFilter({
   onClear,
   showVacantOnly,
   onToggleVacant,
+  hideVacant,
+  onToggleHideVacant,
   showProposedOnly,
   onToggleProposed,
   searchQuery,
@@ -93,6 +97,15 @@ export function OrganizationFilter({
             className="rounded"
           />
           Show vacant only
+        </label>
+        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={hideVacant}
+            onChange={onToggleHideVacant}
+            className="rounded"
+          />
+          Hide vacant
         </label>
         <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
           <input
