@@ -69,7 +69,9 @@ export interface CallingProposal {
   id: string;
   type: "assign" | "release" | "move";
   status: string;
+  toMemberId?: string;
   toMemberName?: string;
+  fromMemberId?: string;
   fromMemberName?: string;
 }
 
@@ -90,9 +92,11 @@ export function useProposalsByCallingId() {
         id: p.id,
         type: p.type as "assign" | "release" | "move",
         status: p.status,
+        toMemberId: p.toMemberId ?? undefined,
         toMemberName: p.toMemberId
           ? memberMap.get(p.toMemberId)?.fullName
           : undefined,
+        fromMemberId: p.fromMemberId ?? undefined,
         fromMemberName: p.fromMemberId
           ? memberMap.get(p.fromMemberId)?.fullName
           : undefined,

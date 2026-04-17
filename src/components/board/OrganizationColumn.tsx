@@ -9,6 +9,7 @@ interface Props {
   callings: CallingWithDetails[];
   activeDropId: string | null;
   proposalMap?: Map<string, CallingProposal[]>;
+  memberCallingsMap?: Map<string, string[]>;
   maxHeight?: number;
 }
 
@@ -80,6 +81,7 @@ export function OrganizationColumn({
   callings,
   activeDropId,
   proposalMap,
+  memberCallingsMap,
   maxHeight,
 }: Props) {
   const filledCount = callings.filter(
@@ -128,6 +130,7 @@ export function OrganizationColumn({
           item={item}
           isOver={activeDropId === item.calling.id}
           proposals={proposals}
+          memberCallingsMap={memberCallingsMap}
         />
       );
     }
@@ -136,6 +139,7 @@ export function OrganizationColumn({
         item={item}
         isOver={activeDropId === item.calling.id}
         proposals={proposals}
+        memberCallingsMap={memberCallingsMap}
       />
     );
   };
@@ -219,10 +223,12 @@ function DroppableFilledSlot({
   item,
   isOver,
   proposals,
+  memberCallingsMap,
 }: {
   item: CallingWithDetails;
   isOver: boolean;
   proposals?: CallingProposal[];
+  memberCallingsMap?: Map<string, string[]>;
 }) {
   const { setNodeRef } = useDroppable({
     id: `filled-${item.calling.id}`,
@@ -234,7 +240,7 @@ function DroppableFilledSlot({
 
   return (
     <div ref={setNodeRef} className={isOver ? "ring-2 ring-primary rounded-lg" : ""}>
-      <CallingCard item={item} proposals={proposals} />
+      <CallingCard item={item} proposals={proposals} memberCallingsMap={memberCallingsMap} />
     </div>
   );
 }
@@ -243,10 +249,12 @@ function DroppableVacantSlot({
   item,
   isOver,
   proposals,
+  memberCallingsMap,
 }: {
   item: CallingWithDetails;
   isOver: boolean;
   proposals?: CallingProposal[];
+  memberCallingsMap?: Map<string, string[]>;
 }) {
   const { setNodeRef } = useDroppable({
     id: `vacant-${item.calling.id}`,
@@ -262,6 +270,7 @@ function DroppableVacantSlot({
         positionName={item.position.positionName}
         isOver={isOver}
         proposals={proposals}
+        memberCallingsMap={memberCallingsMap}
       />
     </div>
   );

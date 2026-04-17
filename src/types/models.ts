@@ -1,4 +1,4 @@
-export type ActivityStatus = "active" | "less-active" | "inactive" | "serving-away";
+export type ActivityStatus = "active" | "less-active" | "inactive" | "serving-away" | "not-eligible";
 
 export interface Member {
   id: string;

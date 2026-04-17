@@ -59,6 +59,7 @@ export function BoardView({
   searchQuery,
 }: Props) {
   const callings = useCallings(organizationFilter.size > 0 ? organizationFilter : undefined);
+  const allCallings = useCallings(); // unfiltered — for member callings tooltip
   const proposalMap = useProposalsByCallingId();
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [activeDropId, setActiveDropId] = useState<string | null>(null);
@@ -136,6 +137,21 @@ export function BoardView({
       activationConstraint: { distance: 5 },
     })
   );
+
+  // Build a map of memberId → list of calling descriptions (position + org)
+  // Uses allCallings (unfiltered) so tooltips show callings from all orgs
+  const memberCallingsMap = useMemo(() => {
+    if (!allCallings) return new Map<string, string[]>();
+    const map = new Map<string, string[]>();
+    for (const item of allCallings) {
+      if (item.calling.memberId && item.calling.status === "active") {
+        const desc = `${item.position.positionName} (${item.organization.name})`;
+        if (!map.has(item.calling.memberId)) map.set(item.calling.memberId, []);
+        map.get(item.calling.memberId)!.push(desc);
+      }
+    }
+    return map;
+  }, [allCallings]);
 
   const grouped = useMemo(() => {
     if (!callings) return new Map<string, CallingWithDetails[]>();
@@ -364,6 +380,7 @@ export function BoardView({
                       callings={items}
                       activeDropId={activeDropId}
                       proposalMap={proposalMap}
+                      memberCallingsMap={memberCallingsMap}
                       maxHeight={availableHeight}
                     />
                   ))}

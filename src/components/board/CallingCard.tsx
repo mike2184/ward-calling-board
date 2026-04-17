@@ -1,3 +1,5 @@
+import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { formatServingDurationShort } from "@/utils/time";
@@ -11,13 +13,134 @@ const STATUS_LABEL: Record<string, string> = {
   approved: "Approved",
 };
 
+/** Sort proposals so releases come before assigns/moves */
+function sortProposals(proposals: CallingProposal[]): CallingProposal[] {
+  return [...proposals].sort((a, b) => {
+    if (a.type === "release" && b.type !== "release") return -1;
+    if (a.type !== "release" && b.type === "release") return 1;
+    return 0;
+  });
+}
+
+/**
+ * Hover tooltip that shows a member's current callings.
+ * Uses a portal to escape overflow containers.
+ */
+function MemberCallingTooltip({
+  memberId,
+  memberCallingsMap,
+  children,
+}: {
+  memberId?: string;
+  memberCallingsMap?: Map<string, string[]>;
+  children: React.ReactNode;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0, flipUp: false });
+  const ref = useRef<HTMLSpanElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const hideTimeout = useRef<ReturnType<typeof setTimeout>>();
+
+  const callings = memberId ? memberCallingsMap?.get(memberId) : undefined;
+
+  const showTooltip = () => {
+    if (hideTimeout.current) clearTimeout(hideTimeout.current);
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      // Estimate tooltip height: header ~20px + ~18px per calling + padding ~16px
+      const estimatedHeight = 20 + (callings?.length ?? 1) * 18 + 16;
+      const spaceBelow = window.innerHeight - rect.bottom - 4;
+      const flipUp = spaceBelow < estimatedHeight && rect.top > estimatedHeight;
+      setPos({
+        top: flipUp ? rect.top : rect.bottom + 4,
+        left: rect.left,
+        flipUp,
+      });
+    }
+    setHovered(true);
+  };
+
+  // Re-adjust position after tooltip renders to use actual height
+  useEffect(() => {
+    if (hovered && tooltipRef.current && ref.current) {
+      const tooltipRect = tooltipRef.current.getBoundingClientRect();
+      const triggerRect = ref.current.getBoundingClientRect();
+      if (tooltipRect.bottom > window.innerHeight) {
+        // Flip above
+        setPos({
+          top: triggerRect.top,
+          left: triggerRect.left,
+          flipUp: true,
+        });
+      }
+    }
+  }, [hovered]);
+
+  const hideTooltip = () => {
+    hideTimeout.current = setTimeout(() => setHovered(false), 100);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (hideTimeout.current) clearTimeout(hideTimeout.current);
+    };
+  }, []);
+
+  if (!callings || callings.length === 0) {
+    return <>{children}</>;
+  }
+
+  return (
+    <>
+      <span
+        ref={ref}
+        onMouseEnter={showTooltip}
+        onMouseLeave={hideTooltip}
+        className="cursor-default"
+      >
+        {children}
+      </span>
+      {hovered &&
+        createPortal(
+          <div
+            ref={tooltipRef}
+            onMouseEnter={() => {
+              if (hideTimeout.current) clearTimeout(hideTimeout.current);
+            }}
+            onMouseLeave={hideTooltip}
+            className="fixed z-[9999] bg-popover border rounded-md shadow-lg py-2 px-3 max-w-[260px]"
+            style={{
+              left: Math.max(8, pos.left),
+              ...(pos.flipUp
+                ? { bottom: window.innerHeight - pos.top + 4 }
+                : { top: pos.top }),
+            }}
+          >
+            <div className="text-xs font-medium text-muted-foreground mb-1">
+              {callings.length} Calling{callings.length !== 1 ? "s" : ""}
+            </div>
+            <ul className="space-y-0.5">
+              {callings.map((name, i) => (
+                <li key={i} className="text-xs text-foreground">
+                  {name}
+                </li>
+              ))}
+            </ul>
+          </div>,
+          document.body
+        )}
+    </>
+  );
+}
+
 interface Props {
   item: CallingWithDetails;
   isDragOverlay?: boolean;
   proposals?: CallingProposal[];
+  memberCallingsMap?: Map<string, string[]>;
 }
 
-export function CallingCard({ item, isDragOverlay, proposals }: Props) {
+export function CallingCard({ item, isDragOverlay, proposals, memberCallingsMap }: Props) {
   const isVacant = item.calling.status === "vacant";
   const hasProposals = !!proposals && proposals.length > 0;
 
@@ -74,16 +197,31 @@ export function CallingCard({ item, isDragOverlay, proposals }: Props) {
         item={item}
         isVacant={isVacant}
         proposals={proposals}
+        memberCallingsMap={memberCallingsMap}
         onRelease={!isVacant && !hasProposals ? handleRelease : undefined}
       />
     </div>
   );
 }
 
-function ProposalLine({ proposal }: { proposal: CallingProposal }) {
+function ProposalLine({
+  proposal,
+  memberCallingsMap,
+}: {
+  proposal: CallingProposal;
+  memberCallingsMap?: Map<string, string[]>;
+}) {
   const isRelease = proposal.type === "release";
   const pillColor = isRelease ? "bg-vacant/15 text-vacant" : "bg-success/15 text-success";
   const textColor = isRelease ? "text-vacant" : "text-success";
+
+  const memberId = isRelease ? proposal.fromMemberId : proposal.toMemberId;
+  const memberName = isRelease ? proposal.fromMemberName : proposal.toMemberName;
+  const actionLabel = proposal.type === "release"
+    ? "Release"
+    : proposal.type === "assign"
+      ? "Assign"
+      : "Move";
 
   return (
     <div className="flex items-center gap-1.5">
@@ -91,9 +229,10 @@ function ProposalLine({ proposal }: { proposal: CallingProposal }) {
         {STATUS_LABEL[proposal.status] ?? proposal.status}
       </span>
       <span className={`text-xs ${textColor} flex-1 truncate`}>
-        {proposal.type === "release" && `Release ${proposal.fromMemberName ?? ""}`}
-        {proposal.type === "assign" && `Assign ${proposal.toMemberName ?? ""}`}
-        {proposal.type === "move" && `Move ${proposal.toMemberName ?? ""}`}
+        {actionLabel}{" "}
+        <MemberCallingTooltip memberId={memberId} memberCallingsMap={memberCallingsMap}>
+          <span className="underline decoration-dotted">{memberName ?? ""}</span>
+        </MemberCallingTooltip>
       </span>
       <button
         onClick={(e) => {
@@ -114,15 +253,18 @@ function CardContent({
   item,
   isVacant,
   proposals,
+  memberCallingsMap,
   onRelease,
 }: {
   item: CallingWithDetails;
   isVacant: boolean;
   proposals?: CallingProposal[];
+  memberCallingsMap?: Map<string, string[]>;
   onRelease?: () => void;
 }) {
   const hasProposals = !!proposals && proposals.length > 0;
   const hasReleaseProposal = hasProposals && proposals.some((p) => p.type === "release");
+  const sorted = hasProposals ? sortProposals(proposals) : [];
 
   return (
     <>
@@ -148,10 +290,18 @@ function CardContent({
         <div className="text-sm text-vacant italic">Vacant</div>
       ) : hasReleaseProposal ? (
         // When there's a release proposal, show the current member de-emphasized
-        <div className="text-sm text-muted-foreground line-through">{item.member?.fullName}</div>
+        <div className="text-sm text-muted-foreground line-through">
+          <MemberCallingTooltip memberId={item.member?.id} memberCallingsMap={memberCallingsMap}>
+            {item.member?.fullName}
+          </MemberCallingTooltip>
+        </div>
       ) : (
         <>
-          <div className="text-sm font-medium">{item.member?.fullName}</div>
+          <div className="text-sm font-medium">
+            <MemberCallingTooltip memberId={item.member?.id} memberCallingsMap={memberCallingsMap}>
+              {item.member?.fullName}
+            </MemberCallingTooltip>
+          </div>
           <div className="text-xs text-muted-foreground mt-0.5">
             {formatServingDurationShort(item.calling.activeDate)}
           </div>
@@ -159,8 +309,8 @@ function CardContent({
       )}
       {hasProposals && (
         <div className="mt-1.5 pt-1.5 border-t border-warning/30 space-y-1">
-          {proposals.map((proposal, i) => (
-            <ProposalLine key={i} proposal={proposal} />
+          {sorted.map((proposal, i) => (
+            <ProposalLine key={i} proposal={proposal} memberCallingsMap={memberCallingsMap} />
           ))}
         </div>
       )}
@@ -172,12 +322,15 @@ export function VacantDropTarget({
   positionName,
   isOver,
   proposals,
+  memberCallingsMap,
 }: {
   positionName: string;
   isOver: boolean;
   proposals?: CallingProposal[];
+  memberCallingsMap?: Map<string, string[]>;
 }) {
   if (proposals && proposals.length > 0) {
+    const sorted = sortProposals(proposals);
     return (
       <div className="rounded-lg p-3 border-l-4 border-l-warning border border-warning/30 bg-warning/5 transition-colors">
         <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
@@ -185,8 +338,8 @@ export function VacantDropTarget({
         </div>
         <div className="text-sm text-vacant italic">Vacant</div>
         <div className="mt-1.5 pt-1.5 border-t border-warning/30 space-y-1">
-          {proposals.map((p, i) => (
-            <ProposalLine key={i} proposal={p} />
+          {sorted.map((p, i) => (
+            <ProposalLine key={i} proposal={p} memberCallingsMap={memberCallingsMap} />
           ))}
         </div>
       </div>
