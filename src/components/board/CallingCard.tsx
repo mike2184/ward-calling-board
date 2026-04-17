@@ -53,13 +53,12 @@ function MemberCallingTooltip({
   const tooltipRef = useRef<HTMLDivElement>(null);
   const hideTimeout = useRef<ReturnType<typeof setTimeout>>();
 
-  const callings = memberId ? memberCallingsMap?.get(memberId) : undefined;
+  const callings = memberId ? (memberCallingsMap?.get(memberId) ?? []) : undefined;
 
   const showTooltip = () => {
     if (hideTimeout.current) clearTimeout(hideTimeout.current);
     if (ref.current) {
       const rect = ref.current.getBoundingClientRect();
-      // Estimate tooltip height: header ~20px + ~18px per calling + padding ~16px
       const estimatedHeight = 20 + (callings?.length ?? 1) * 18 + 16;
       const spaceBelow = window.innerHeight - rect.bottom - 4;
       const flipUp = spaceBelow < estimatedHeight && rect.top > estimatedHeight;
@@ -98,7 +97,7 @@ function MemberCallingTooltip({
     };
   }, []);
 
-  if (!callings || callings.length === 0) {
+  if (callings === undefined) {
     return <>{children}</>;
   }
 
@@ -128,7 +127,10 @@ function MemberCallingTooltip({
                 : { top: pos.top }),
             }}
           >
-            <div className="text-xs font-medium text-muted-foreground mb-1">
+            {callings.length === 0 ? (
+              <div className="text-xs text-muted-foreground italic">No current callings</div>
+            ) : (
+            <><div className="text-xs font-medium text-muted-foreground mb-1">
               {callings.length} Calling{callings.length !== 1 ? "s" : ""}
             </div>
             <ul className="space-y-0.5">
@@ -137,7 +139,8 @@ function MemberCallingTooltip({
                   {name}
                 </li>
               ))}
-            </ul>
+            </ul></>
+            )}
           </div>,
           document.body
         )}
