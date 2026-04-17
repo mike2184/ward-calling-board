@@ -30,4 +30,22 @@ db.version(2).stores({
   members: "id, lastName, fullName, activityStatus",
 });
 
+db.version(3).upgrade(async (tx) => {
+  const maleOrgIds = new Set(["bishopric", "elders-quorum", "priests-quorum", "teachers-quorum", "deacons-quorum", "young-men"]);
+  const femaleOrgIds = new Set(["relief-society", "young-women"]);
+  const femalePositionIds = new Set(["primary-president", "primary-1st", "primary-2nd", "primary-secretary"]);
+
+  const positions = await tx.table("callingPositions").toArray();
+  const updates = positions
+    .filter((p) => maleOrgIds.has(p.organizationId) || femaleOrgIds.has(p.organizationId) || femalePositionIds.has(p.id))
+    .map((p) => ({
+      ...p,
+      genderRestriction: maleOrgIds.has(p.organizationId) ? "M" : "F",
+    }));
+
+  if (updates.length > 0) {
+    await tx.table("callingPositions").bulkPut(updates);
+  }
+});
+
 export { db };

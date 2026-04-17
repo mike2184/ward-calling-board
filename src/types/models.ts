@@ -30,6 +30,7 @@ export interface CallingPosition {
   sortOrder: number;
   isRequired: boolean;
   maxHolders: number;
+  genderRestriction?: "M" | "F";
 }
 
 export interface Calling {

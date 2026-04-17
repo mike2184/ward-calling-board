@@ -13,6 +13,18 @@ const STATUS_LABEL: Record<string, string> = {
   approved: "Approved",
 };
 
+function GenderBadge({ restriction }: { restriction?: "M" | "F" }) {
+  if (!restriction) return null;
+  return (
+    <span
+      className={`w-2 h-2 rounded-full flex-shrink-0 inline-block ${
+        restriction === "M" ? "bg-blue-400" : "bg-pink-400"
+      }`}
+      title={restriction === "M" ? "Men only" : "Women only"}
+    />
+  );
+}
+
 /** Sort proposals so releases come before assigns/moves */
 function sortProposals(proposals: CallingProposal[]): CallingProposal[] {
   return [...proposals].sort((a, b) => {
@@ -269,7 +281,8 @@ function CardContent({
   return (
     <>
       <div className="flex items-start justify-between gap-1">
-        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
+          <GenderBadge restriction={item.position.genderRestriction} />
           {item.position.positionName}
         </div>
         {onRelease && (
@@ -323,17 +336,20 @@ export function VacantDropTarget({
   isOver,
   proposals,
   memberCallingsMap,
+  genderRestriction,
 }: {
   positionName: string;
   isOver: boolean;
   proposals?: CallingProposal[];
   memberCallingsMap?: Map<string, string[]>;
+  genderRestriction?: "M" | "F";
 }) {
   if (proposals && proposals.length > 0) {
     const sorted = sortProposals(proposals);
     return (
       <div className="rounded-lg p-3 border-l-4 border-l-warning border border-warning/30 bg-warning/5 transition-colors">
-        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
+          <GenderBadge restriction={genderRestriction} />
           {positionName}
         </div>
         <div className="text-sm text-vacant italic">Vacant</div>
@@ -354,7 +370,8 @@ export function VacantDropTarget({
           : "border-border bg-muted/20"
       }`}
     >
-      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
+        <GenderBadge restriction={genderRestriction} />
         {positionName}
       </div>
       <div className={`text-sm italic ${isOver ? "text-primary" : "text-vacant"}`}>

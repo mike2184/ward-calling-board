@@ -271,6 +271,7 @@ function DroppableVacantSlot({
         isOver={isOver}
         proposals={proposals}
         memberCallingsMap={memberCallingsMap}
+        genderRestriction={item.position.genderRestriction}
       />
     </div>
   );

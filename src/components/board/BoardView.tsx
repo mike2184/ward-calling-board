@@ -64,6 +64,7 @@ export function BoardView({
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [activeDropId, setActiveDropId] = useState<string | null>(null);
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
+  const [dropError, setDropError] = useState<string | null>(null);
 
   // Synced horizontal scrollbar refs
   const contentRef = useRef<HTMLDivElement>(null);
@@ -104,6 +105,12 @@ export function BoardView({
     }
     syncing.current = false;
   }, []);
+
+  useEffect(() => {
+    if (!dropError) return;
+    const t = setTimeout(() => setDropError(null), 4000);
+    return () => clearTimeout(t);
+  }, [dropError]);
 
   // Callback ref to observe the inner content div's width
   const innerRef = useCallback((node: HTMLDivElement | null) => {
@@ -243,6 +250,23 @@ export function BoardView({
     const targetProposals = proposalMap?.get(targetCalling.calling.id);
     const hasReleaseProposal = targetProposals?.some((p) => p.type === "release") ?? false;
 
+    // Gender restriction check
+    const genderRestriction = targetCalling.position.genderRestriction;
+    if (genderRestriction) {
+      let memberGender: "M" | "F" | undefined;
+      if (activeData?.type === "member") {
+        memberGender = (activeData.member as Member).gender;
+      } else if (activeData?.type === "calling") {
+        memberGender = (activeData.calling as CallingWithDetails).member?.gender;
+      }
+      if (memberGender && memberGender !== genderRestriction) {
+        setDropError(
+          `This position is restricted to ${genderRestriction === "M" ? "men" : "women"} only.`
+        );
+        return;
+      }
+    }
+
     // Member from sidebar dropped onto a slot
     if (activeData?.type === "member") {
       const member: Member = activeData.member;
@@ -324,6 +348,7 @@ export function BoardView({
   ).length ?? 0;
 
   return (
+    <>
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
@@ -459,5 +484,17 @@ export function BoardView({
         </div>
       )}
     </DndContext>
+    {dropError && (
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] bg-destructive text-destructive-foreground px-4 py-2 rounded-md shadow-lg text-sm flex items-center gap-3">
+        {dropError}
+        <button
+          onClick={() => setDropError(null)}
+          className="text-destructive-foreground/70 hover:text-destructive-foreground transition-colors"
+        >
+          ✕
+        </button>
+      </div>
+    )}
+    </>
   );
 }
