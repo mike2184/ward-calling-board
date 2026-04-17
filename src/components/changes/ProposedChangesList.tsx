@@ -8,7 +8,8 @@ import {
   deleteProposal,
   type ProposalWithDetails,
 } from "@/hooks/useProposals";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { format } from "date-fns";
 
 interface Props {
@@ -214,6 +215,13 @@ function SustainingReport({
   const today = format(new Date(), "MMMM d, yyyy");
   const [groupBy, setGroupBy] = useState<"type" | "org">("type");
 
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = `@media print { body > *:not(#sustaining-report-root) { display: none !important; } }`;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
+
   const POSITION_ORDER: string[] = [
     "bishop", "president", "1st counselor", "first counselor",
     "2nd counselor", "second counselor", "secretary", "executive secretary",
@@ -256,8 +264,8 @@ function SustainingReport({
 
   const hasContent = releases.length > 0 || assignments.length > 0;
 
-  return (
-    <div className="fixed inset-0 z-[60] bg-background flex flex-col print:static">
+  return createPortal(
+    <div id="sustaining-report-root" className="fixed inset-0 z-[60] bg-background flex flex-col print:static print:inset-auto print:block">
       {/* Screen-only header bar */}
       <div className="flex items-center justify-between px-8 py-4 border-b print:hidden">
         <h2 className="text-lg font-semibold">Sustaining Report</h2>
@@ -303,7 +311,7 @@ function SustainingReport({
       </div>
 
       {/* Printable report content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto print:overflow-visible">
         <div className="max-w-2xl mx-auto px-8 py-10 print:max-w-none print:px-0 print:py-0">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold">Sustaining Report</h1>
@@ -414,7 +422,8 @@ function SustainingReport({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -448,7 +457,7 @@ export function ProposedChangesList({ onClose }: Props) {
         />
       )}
 
-      <div className="fixed inset-0 bg-black/50 flex justify-end z-50">
+      <div className="fixed inset-0 bg-black/50 flex justify-end z-50 print:hidden">
         <div className="bg-background w-full max-w-md h-full flex flex-col shadow-xl">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b">
