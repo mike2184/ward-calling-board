@@ -1,5 +1,5 @@
 import { useDraggable } from "@dnd-kit/core";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useLayoutEffect, useEffect } from "react";
 import { createPortal } from "react-dom";
 import type { Member } from "@/types/models";
 
@@ -8,13 +8,13 @@ const ACTIVITY_DOT_COLORS: Record<string, string> = {
   "less-active": "bg-yellow-500",
   inactive: "bg-red-500",
   "serving-away": "bg-blue-500",
+  "not-eligible": "bg-gray-400",
 };
 
 function DragCallingPill({ count, callingNames }: { count: number; callingNames: string[] }) {
   const [open, setOpen] = useState(false);
   const pillRef = useRef<HTMLSpanElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     if (!open) return;
@@ -30,6 +30,27 @@ function DragCallingPill({ count, callingNames }: { count: number; callingNames:
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  useLayoutEffect(() => {
+    if (!open || !popupRef.current || !pillRef.current) return;
+    const pill = pillRef.current.getBoundingClientRect();
+    const popup = popupRef.current;
+    const popupHeight = popup.offsetHeight;
+    const popupWidth = popup.offsetWidth;
+    const spaceBelow = window.innerHeight - pill.bottom - 4;
+    const flipUp = spaceBelow < popupHeight && pill.top > popupHeight;
+
+    const rawLeft = pill.right - popupWidth;
+    popup.style.left = `${Math.min(window.innerWidth - popupWidth - 8, Math.max(8, rawLeft))}px`;
+    if (flipUp) {
+      popup.style.top = "";
+      popup.style.bottom = `${window.innerHeight - pill.top + 4}px`;
+    } else {
+      popup.style.bottom = "";
+      popup.style.top = `${pill.bottom + 4}px`;
+    }
+    popup.style.visibility = "visible";
+  }, [open]);
+
   if (count === 0) return null;
 
   return (
@@ -38,14 +59,9 @@ function DragCallingPill({ count, callingNames }: { count: number; callingNames:
         ref={pillRef}
         onPointerDown={(e) => {
           e.stopPropagation(); // prevent drag initiation
-          if (!open && pillRef.current) {
-            const rect = pillRef.current.getBoundingClientRect();
-            setPos({ top: rect.top, left: rect.left - 4 });
-          }
           setOpen(!open);
         }}
         className="text-[11px] font-medium bg-primary/10 text-primary px-1.5 py-0.5 rounded-full min-w-[20px] text-center hover:bg-primary/20 transition-colors flex-shrink-0 cursor-pointer"
-        title={`${count} calling${count !== 1 ? "s" : ""}`}
       >
         {count}
       </span>
@@ -53,7 +69,7 @@ function DragCallingPill({ count, callingNames }: { count: number; callingNames:
         <div
           ref={popupRef}
           className="fixed z-[9999] bg-popover border rounded-md shadow-lg py-2 px-3 max-w-[220px]"
-          style={{ top: pos.top + 28, left: Math.max(8, pos.left - 180) }}
+          style={{ visibility: "hidden" }}
         >
           <div className="text-xs font-medium text-muted-foreground mb-1">
             {count} Calling{count !== 1 ? "s" : ""}
@@ -77,6 +93,7 @@ interface Props {
   callingCount?: number;
   callingNames?: string[];
   projected?: boolean;
+  hasProposedCalling?: boolean;
 }
 
 export function DraggableMemberCard({
@@ -86,6 +103,7 @@ export function DraggableMemberCard({
   callingCount,
   callingNames,
   projected,
+  hasProposedCalling,
 }: Props) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `member-${member.id}`,
@@ -116,7 +134,9 @@ export function DraggableMemberCard({
       } ${
         projected
           ? "bg-warning/8 border border-dashed border-warning/40 hover:bg-warning/15"
-          : "hover:bg-muted/50"
+          : hasProposedCalling
+            ? "bg-success/8 border border-dashed border-success/40 hover:bg-success/15"
+            : "hover:bg-muted/50"
       }`}
     >
       <div className="flex items-center justify-between gap-1">
@@ -125,6 +145,9 @@ export function DraggableMemberCard({
           <span className={`truncate ${projected ? "italic" : ""}`}>{member.fullName}</span>
           {projected && (
             <span className="text-[9px] text-warning font-medium flex-shrink-0">PROJ</span>
+          )}
+          {hasProposedCalling && (
+            <span className="text-[9px] text-success font-medium flex-shrink-0">PROP</span>
           )}
         </span>
         <div className="flex items-center gap-1.5 flex-shrink-0">

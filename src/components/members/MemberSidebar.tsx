@@ -3,14 +3,14 @@ import {
   updateMemberActivityStatus,
   type MemberWithCallingInfo,
 } from "@/hooks/useMembers";
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { DraggableMemberCard } from "./DraggableMemberCard";
 import type { Member, ActivityStatus } from "@/types/models";
 
 type AgeFilter = "all" | "children" | "youth" | "adults";
 type GenderFilter = "all" | "M" | "F";
-type ActivityFilter = "all" | "active" | "less-active" | "inactive" | "serving-away";
+type ActivityFilter = "all" | "active" | "less-active" | "inactive" | "serving-away" | "not-eligible";
 type SortOption = "name" | "age-asc" | "age-desc";
 
 interface Props {
@@ -84,6 +84,7 @@ const ACTIVITY_STATUS_COLORS: Record<string, string> = {
   "less-active": "bg-yellow-500",
   inactive: "bg-red-500",
   "serving-away": "bg-blue-500",
+  "not-eligible": "bg-gray-400",
 };
 
 const ACTIVITY_STATUS_LABELS: Record<string, string> = {
@@ -91,6 +92,7 @@ const ACTIVITY_STATUS_LABELS: Record<string, string> = {
   "less-active": "Less Active",
   inactive: "Inactive",
   "serving-away": "Serving Away",
+  "not-eligible": "Not Eligible",
 };
 
 function ActivityStatusDot({ member }: { member: Member }) {
@@ -98,7 +100,6 @@ function ActivityStatusDot({ member }: { member: Member }) {
   const dotRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const status = member.activityStatus ?? "active";
-  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     if (!open) return;
@@ -114,12 +115,28 @@ function ActivityStatusDot({ member }: { member: Member }) {
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  useLayoutEffect(() => {
+    if (!open || !menuRef.current || !dotRef.current) return;
+    const dot = dotRef.current.getBoundingClientRect();
+    const menu = menuRef.current;
+    const menuHeight = menu.offsetHeight;
+    const menuWidth = menu.offsetWidth;
+    const spaceBelow = window.innerHeight - dot.bottom - 4;
+    const flipUp = spaceBelow < menuHeight && dot.top > menuHeight;
+
+    menu.style.left = `${Math.min(window.innerWidth - menuWidth - 8, Math.max(8, dot.left))}px`;
+    if (flipUp) {
+      menu.style.top = "";
+      menu.style.bottom = `${window.innerHeight - dot.top + 4}px`;
+    } else {
+      menu.style.bottom = "";
+      menu.style.top = `${dot.bottom + 4}px`;
+    }
+    menu.style.visibility = "visible";
+  }, [open]);
+
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!open && dotRef.current) {
-      const rect = dotRef.current.getBoundingClientRect();
-      setMenuPos({ top: rect.bottom + 4, left: rect.left });
-    }
     setOpen(!open);
   };
 
@@ -135,9 +152,9 @@ function ActivityStatusDot({ member }: { member: Member }) {
         <div
           ref={menuRef}
           className="fixed z-[9999] bg-popover border rounded-md shadow-md py-1 min-w-[120px]"
-          style={{ top: menuPos.top, left: menuPos.left }}
+          style={{ visibility: "hidden" }}
         >
-          {(["active", "less-active", "inactive", "serving-away"] as ActivityStatus[]).map((s) => (
+          {(["active", "less-active", "inactive", "serving-away", "not-eligible"] as ActivityStatus[]).map((s) => (
             <button
               key={s}
               onClick={(e) => {
@@ -164,7 +181,6 @@ function CallingCountPill({ count, callingNames }: { count: number; callingNames
   const [open, setOpen] = useState(false);
   const pillRef = useRef<HTMLButtonElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     if (!open) return;
@@ -180,13 +196,29 @@ function CallingCountPill({ count, callingNames }: { count: number; callingNames
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  useLayoutEffect(() => {
+    if (!open || !popupRef.current || !pillRef.current) return;
+    const pill = pillRef.current.getBoundingClientRect();
+    const popup = popupRef.current;
+    const popupHeight = popup.offsetHeight;
+    const popupWidth = popup.offsetWidth;
+    const spaceBelow = window.innerHeight - pill.bottom - 4;
+    const flipUp = spaceBelow < popupHeight && pill.top > popupHeight;
+
+    const rawLeft = pill.right - popupWidth;
+    popup.style.left = `${Math.min(window.innerWidth - popupWidth - 8, Math.max(8, rawLeft))}px`;
+    if (flipUp) {
+      popup.style.top = "";
+      popup.style.bottom = `${window.innerHeight - pill.top + 4}px`;
+    } else {
+      popup.style.bottom = "";
+      popup.style.top = `${pill.bottom + 4}px`;
+    }
+    popup.style.visibility = "visible";
+  }, [open]);
+
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!open && pillRef.current) {
-      const rect = pillRef.current.getBoundingClientRect();
-      // Position to the left of the pill, aligned with the top
-      setPos({ top: rect.top, left: rect.left - 4 });
-    }
     setOpen(!open);
   };
 
@@ -206,7 +238,7 @@ function CallingCountPill({ count, callingNames }: { count: number; callingNames
         <div
           ref={popupRef}
           className="fixed z-[9999] bg-popover border rounded-md shadow-lg py-2 px-3 max-w-[220px]"
-          style={{ top: pos.top + 28, left: Math.max(8, pos.left - 180) }}
+          style={{ visibility: "hidden" }}
         >
           <div className="text-xs font-medium text-muted-foreground mb-1">
             {count} Calling{count !== 1 ? "s" : ""}
@@ -223,20 +255,24 @@ function CallingCountPill({ count, callingNames }: { count: number; callingNames
   );
 }
 
-function MemberRow({ member, callingCount, callingNames, projected, projectedCallingCount }: {
+function MemberRow({ member, callingCount, callingNames, projected, projectedCallingCount, hasProposedCalling }: {
   member: Member & { age?: number };
   callingCount?: number;
   callingNames?: string[];
   projected?: boolean;
   /** When set, shows the projected count change (e.g. "2→3") */
   projectedCallingCount?: number;
+  /** Member currently has no calling but has a proposed assignment */
+  hasProposedCalling?: boolean;
 }) {
   const hasProjectedChange = projectedCallingCount != null && projectedCallingCount !== callingCount;
   return (
     <div className={`text-sm py-1 px-2 rounded cursor-default ${
       projected
         ? "bg-warning/8 border border-dashed border-warning/40 hover:bg-warning/15"
-        : "hover:bg-muted/50"
+        : hasProposedCalling
+          ? "bg-success/8 border border-dashed border-success/40 hover:bg-success/15"
+          : "hover:bg-muted/50"
     }`}>
       <div className="flex items-center justify-between gap-1">
         <span className="flex items-center gap-1.5 min-w-0">
@@ -244,6 +280,9 @@ function MemberRow({ member, callingCount, callingNames, projected, projectedCal
           <span className={`truncate ${projected ? "italic" : ""}`}>{member.fullName}</span>
           {projected && (
             <span className="text-[9px] text-warning font-medium flex-shrink-0">PROJ</span>
+          )}
+          {hasProposedCalling && (
+            <span className="text-[9px] text-success font-medium flex-shrink-0">PROP</span>
           )}
         </span>
         <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -384,8 +423,8 @@ export function MemberSidebar({ isBoardView }: Props) {
           ))}
         </div>
         <div className="flex gap-1">
-          {(["all", "active", "less-active", "inactive", "serving-away"] as ActivityFilter[]).map((f) => {
-            const label = { all: "All", active: "A", "less-active": "LA", inactive: "IA", "serving-away": "SA" }[f];
+          {(["all", "active", "less-active", "inactive", "serving-away", "not-eligible"] as ActivityFilter[]).map((f) => {
+            const label = { all: "All", active: "A", "less-active": "LA", inactive: "IA", "serving-away": "SA", "not-eligible": "NE" }[f];
             return (
               <button
                 key={f}
@@ -443,11 +482,11 @@ export function MemberSidebar({ isBoardView }: Props) {
                 <>
                   {isBoardView ? (
                     filteredUnassigned.map((m) => (
-                      <DraggableMemberCard key={m.id} member={m} ageDisplay={m.age} />
+                      <DraggableMemberCard key={m.id} member={m} ageDisplay={m.age} hasProposedCalling={m.projectedCallingCount > 0} />
                     ))
                   ) : (
                     filteredUnassigned.map((m) => (
-                      <MemberRow key={m.id} member={m} />
+                      <MemberRow key={m.id} member={m} hasProposedCalling={m.projectedCallingCount > 0} />
                     ))
                   )}
                   {filteredProjectedUnassigned.length > 0 && (
