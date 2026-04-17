@@ -190,6 +190,18 @@ function ProposalCard({
   );
 }
 
+const ORG_SORT_ORDER = [
+  "Bishopric", "Elders Quorum", "Relief Society", "Priests Quorum",
+  "Teachers Quorum", "Deacons Quorum", "Young Men", "Young Women",
+  "Primary", "Sunday School", "Ward Missionaries", "Ward Activities",
+  "Temple & Family History", "Music", "Other Callings",
+];
+
+function orgSortKey(name: string): number {
+  const i = ORG_SORT_ORDER.indexOf(name);
+  return i === -1 ? 999 : i;
+}
+
 function SustainingReport({
   releases,
   assignments,
@@ -200,23 +212,13 @@ function SustainingReport({
   onClose: () => void;
 }) {
   const today = format(new Date(), "MMMM d, yyyy");
+  const [groupBy, setGroupBy] = useState<"type" | "org">("type");
 
-  // Position sort order — presidency positions first in canonical order
   const POSITION_ORDER: string[] = [
-    "bishop",
-    "president",
-    "1st counselor",
-    "first counselor",
-    "2nd counselor",
-    "second counselor",
-    "secretary",
-    "executive secretary",
-    "assistant secretary",
-    "1st assistant",
-    "2nd assistant",
-    "adviser",
-    "teacher",
-    "specialist",
+    "bishop", "president", "1st counselor", "first counselor",
+    "2nd counselor", "second counselor", "secretary", "executive secretary",
+    "assistant secretary", "1st assistant", "2nd assistant", "adviser",
+    "teacher", "specialist",
   ];
 
   function positionSortKey(positionName: string | undefined): number {
@@ -232,32 +234,27 @@ function SustainingReport({
     return [...items].sort((a, b) => positionSortKey(a.positionName) - positionSortKey(b.positionName));
   }
 
-  // Group by organization, sorted by position
-  const releasesByOrg = useMemo(() => {
+  function groupByOrg(items: ProposalWithDetails[]) {
     const map = new Map<string, ProposalWithDetails[]>();
-    for (const p of releases) {
+    for (const p of items) {
       const org = p.organizationName ?? "Other";
       if (!map.has(org)) map.set(org, []);
       map.get(org)!.push(p);
     }
-    for (const [org, items] of map) {
-      map.set(org, sortByPosition(items));
-    }
-    return map;
-  }, [releases]);
+    for (const [org, list] of map) map.set(org, sortByPosition(list));
+    return new Map([...map.entries()].sort((a, b) => orgSortKey(a[0]) - orgSortKey(b[0])));
+  }
 
-  const assignmentsByOrg = useMemo(() => {
-    const map = new Map<string, ProposalWithDetails[]>();
-    for (const p of assignments) {
-      const org = p.organizationName ?? "Other";
-      if (!map.has(org)) map.set(org, []);
-      map.get(org)!.push(p);
-    }
-    for (const [org, items] of map) {
-      map.set(org, sortByPosition(items));
-    }
-    return map;
-  }, [assignments]);
+  const releasesByOrg = useMemo(() => groupByOrg(releases), [releases]);
+  const assignmentsByOrg = useMemo(() => groupByOrg(assignments), [assignments]);
+
+  // By-org view: all orgs that appear in either releases or assignments
+  const allOrgs = useMemo(() => {
+    const orgs = new Set([...releasesByOrg.keys(), ...assignmentsByOrg.keys()]);
+    return [...orgs].sort((a, b) => orgSortKey(a) - orgSortKey(b));
+  }, [releasesByOrg, assignmentsByOrg]);
+
+  const hasContent = releases.length > 0 || assignments.length > 0;
 
   return (
     <div className="fixed inset-0 z-[60] bg-background flex flex-col print:static">
@@ -265,6 +262,31 @@ function SustainingReport({
       <div className="flex items-center justify-between px-8 py-4 border-b print:hidden">
         <h2 className="text-lg font-semibold">Sustaining Report</h2>
         <div className="flex items-center gap-3">
+          {/* Group-by toggle */}
+          {hasContent && (
+            <div className="flex rounded-md border overflow-hidden text-sm">
+              <button
+                onClick={() => setGroupBy("type")}
+                className={`px-3 py-1.5 font-medium transition-colors ${
+                  groupBy === "type"
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-muted text-muted-foreground"
+                }`}
+              >
+                By Type
+              </button>
+              <button
+                onClick={() => setGroupBy("org")}
+                className={`px-3 py-1.5 font-medium transition-colors border-l ${
+                  groupBy === "org"
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-muted text-muted-foreground"
+                }`}
+              >
+                By Organization
+              </button>
+            </div>
+          )}
           <button
             onClick={() => window.print()}
             className="text-sm px-4 py-2 rounded bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors"
@@ -288,56 +310,107 @@ function SustainingReport({
             <p className="text-muted-foreground mt-1 print:text-gray-500">{today}</p>
           </div>
 
-          {releases.length > 0 && (
-            <section className="mb-8">
-              <h2 className="text-lg font-semibold border-b pb-2 mb-4">Releases</h2>
-              {Array.from(releasesByOrg.entries()).map(([org, items]) => (
-                <div key={org} className="mb-4">
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2 print:text-gray-600">
-                    {org}
-                  </h3>
-                  <ul className="space-y-1.5 ml-1">
-                    {items.map((p) => (
-                      <li key={p.id} className="text-sm">
-                        <span className="font-medium">{p.fromMemberName}</span>
-                        <span className="text-muted-foreground print:text-gray-500">
-                          {" "}&mdash; {p.positionName}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </section>
-          )}
-
-          {assignments.length > 0 && (
-            <section className="mb-8">
-              <h2 className="text-lg font-semibold border-b pb-2 mb-4">New Callings</h2>
-              {Array.from(assignmentsByOrg.entries()).map(([org, items]) => (
-                <div key={org} className="mb-4">
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2 print:text-gray-600">
-                    {org}
-                  </h3>
-                  <ul className="space-y-1.5 ml-1">
-                    {items.map((p) => (
-                      <li key={p.id} className="text-sm">
-                        <span className="font-medium">{p.toMemberName}</span>
-                        <span className="text-muted-foreground print:text-gray-500">
-                          {" "}&mdash; {p.positionName}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </section>
-          )}
-
-          {releases.length === 0 && assignments.length === 0 && (
+          {!hasContent && (
             <p className="text-center text-muted-foreground py-12">
               No proposed changes to report.
             </p>
+          )}
+
+          {hasContent && groupBy === "type" && (
+            <>
+              {releases.length > 0 && (
+                <section className="mb-8">
+                  <h2 className="text-lg font-semibold border-b pb-2 mb-4">Releases</h2>
+                  {Array.from(releasesByOrg.entries()).map(([org, items]) => (
+                    <div key={org} className="mb-4">
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2 print:text-gray-600">
+                        {org}
+                      </h3>
+                      <ul className="space-y-1.5 ml-1">
+                        {items.map((p) => (
+                          <li key={p.id} className="text-sm">
+                            <span className="font-medium">{p.fromMemberName}</span>
+                            <span className="text-muted-foreground print:text-gray-500">
+                              {" "}&mdash; {p.positionName}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </section>
+              )}
+              {assignments.length > 0 && (
+                <section className="mb-8">
+                  <h2 className="text-lg font-semibold border-b pb-2 mb-4">New Callings</h2>
+                  {Array.from(assignmentsByOrg.entries()).map(([org, items]) => (
+                    <div key={org} className="mb-4">
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2 print:text-gray-600">
+                        {org}
+                      </h3>
+                      <ul className="space-y-1.5 ml-1">
+                        {items.map((p) => (
+                          <li key={p.id} className="text-sm">
+                            <span className="font-medium">{p.toMemberName}</span>
+                            <span className="text-muted-foreground print:text-gray-500">
+                              {" "}&mdash; {p.positionName}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </section>
+              )}
+            </>
+          )}
+
+          {hasContent && groupBy === "org" && (
+            <>
+              {allOrgs.map((org) => {
+                const orgReleases = releasesByOrg.get(org) ?? [];
+                const orgAssignments = assignmentsByOrg.get(org) ?? [];
+                return (
+                  <section key={org} className="mb-8">
+                    <h2 className="text-lg font-semibold border-b pb-2 mb-4">{org}</h2>
+                    {orgReleases.length > 0 && (
+                      <div className="mb-3">
+                        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2 print:text-gray-600">
+                          Releases
+                        </h3>
+                        <ul className="space-y-1.5 ml-1">
+                          {orgReleases.map((p) => (
+                            <li key={p.id} className="text-sm">
+                              <span className="font-medium">{p.fromMemberName}</span>
+                              <span className="text-muted-foreground print:text-gray-500">
+                                {" "}&mdash; {p.positionName}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {orgAssignments.length > 0 && (
+                      <div className="mb-3">
+                        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2 print:text-gray-600">
+                          New Callings
+                        </h3>
+                        <ul className="space-y-1.5 ml-1">
+                          {orgAssignments.map((p) => (
+                            <li key={p.id} className="text-sm">
+                              <span className="font-medium">{p.toMemberName}</span>
+                              <span className="text-muted-foreground print:text-gray-500">
+                                {" "}&mdash; {p.positionName}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
+            </>
           )}
         </div>
       </div>
