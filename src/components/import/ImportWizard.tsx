@@ -15,7 +15,7 @@ interface ImportResult {
 }
 
 export function ImportWizard({ onClose }: { onClose: () => void }) {
-  const [activeTab, setActiveTab] = useState<Tab>("lcr-json");
+  const [activeTab, setActiveTab] = useState<Tab>("member-pdf");
   const [step, setStep] = useState<Step>("input");
   const [inputText, setInputText] = useState("");
   const [parsedCallings, setParsedCallings] = useState<ParsedCalling[]>([]);
@@ -148,6 +148,26 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
           <div className="flex border-b px-6">
             <button
               className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === "member-pdf"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => setActiveTab("member-pdf")}
+            >
+              Members PDF
+            </button>
+            <button
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === "pdf"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => setActiveTab("pdf")}
+            >
+              Callings PDF
+            </button>
+            <button
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
                 activeTab === "lcr-json"
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -165,26 +185,6 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
               onClick={() => setActiveTab("csv")}
             >
               CSV Upload
-            </button>
-            <button
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                activeTab === "pdf"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-              onClick={() => setActiveTab("pdf")}
-            >
-              Callings PDF
-            </button>
-            <button
-              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                activeTab === "member-pdf"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-              onClick={() => setActiveTab("member-pdf")}
-            >
-              Members PDF
             </button>
           </div>
         )}
