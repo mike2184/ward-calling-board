@@ -56,6 +56,7 @@ function ProposalCard({
   proposal: ProposalWithDetails;
 }) {
   const [loading, setLoading] = useState(false);
+  const hasNote = !!proposal.reason && proposal.reason.trim().length > 0;
 
   const handleAdvance = async () => {
     setLoading(true);
@@ -109,6 +110,11 @@ function ProposalCard({
           Remove
         </button>
       </div>
+      {hasNote && (
+        <div className="text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1.5 whitespace-pre-wrap">
+          {proposal.reason}
+        </div>
+      )}
 
       {/* Details */}
       <div className="text-sm">

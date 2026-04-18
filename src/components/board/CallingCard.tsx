@@ -6,6 +6,7 @@ import { formatServingDurationShort } from "@/utils/time";
 import type { CallingWithDetails } from "@/hooks/useCallings";
 import type { CallingProposal } from "@/hooks/useProposals";
 import { createReleaseProposal, deleteProposal } from "@/hooks/useProposals";
+import { NotesButton } from "./NotesButton";
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "Draft",
@@ -288,19 +289,24 @@ function CardContent({
           <GenderBadge restriction={item.position.genderRestriction} />
           {item.position.positionName}
         </div>
-        {onRelease && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              onRelease();
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="text-[10px] px-1.5 py-0.5 rounded border text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors flex-shrink-0"
-          >
-            Release
-          </button>
-        )}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {hasProposals && (
+            <NotesButton proposals={proposals!} positionName={item.position.positionName} />
+          )}
+          {onRelease && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onRelease();
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="text-[10px] px-1.5 py-0.5 rounded border text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors"
+            >
+              Release
+            </button>
+          )}
+        </div>
       </div>
       {isVacant ? (
         <div className="text-sm text-vacant italic">Vacant</div>
@@ -351,9 +357,12 @@ export function VacantDropTarget({
     const sorted = sortProposals(proposals);
     return (
       <div className="rounded-lg p-3 border-l-4 border-l-warning border border-warning/30 bg-warning/5 transition-colors">
-        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
-          <GenderBadge restriction={genderRestriction} />
-          {positionName}
+        <div className="flex items-start justify-between gap-1">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
+            <GenderBadge restriction={genderRestriction} />
+            {positionName}
+          </div>
+          <NotesButton proposals={proposals} positionName={positionName} />
         </div>
         <div className="text-sm text-vacant italic">Vacant</div>
         <div className="mt-1.5 pt-1.5 border-t border-warning/30 space-y-1">

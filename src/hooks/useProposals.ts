@@ -73,6 +73,7 @@ export interface CallingProposal {
   toMemberName?: string;
   fromMemberId?: string;
   fromMemberName?: string;
+  reason?: string;
 }
 
 export function useProposalsByCallingId() {
@@ -100,6 +101,7 @@ export function useProposalsByCallingId() {
         fromMemberName: p.fromMemberId
           ? memberMap.get(p.fromMemberId)?.fullName
           : undefined,
+        reason: p.reason,
       };
       if (!map.has(p.callingId)) map.set(p.callingId, []);
       map.get(p.callingId)!.push(entry);
@@ -287,4 +289,11 @@ export async function revertProposal(id: string): Promise<void> {
 
 export async function deleteProposal(id: string): Promise<void> {
   await db.proposedChanges.delete(id);
+}
+
+export async function updateProposalNotes(id: string, reason: string): Promise<void> {
+  await db.proposedChanges.update(id, {
+    reason: reason.trim() || undefined,
+    updatedAt: new Date().toISOString(),
+  });
 }
