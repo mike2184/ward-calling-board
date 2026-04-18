@@ -7,7 +7,7 @@ import { ImportWizard } from "@/components/import/ImportWizard";
 import { ProposedChangesList } from "@/components/changes/ProposedChangesList";
 import { Dashboard } from "@/components/dashboard/Dashboard";
 import { seedDefaultData, clearAllData } from "@/data/import-service";
-import { downloadCsvExport, downloadJsonBackup, importFromJson } from "@/data/export-service";
+import { downloadCsvExport, downloadJsonBackup, importFromJson, downloadMetadataBackup, importMetadata } from "@/data/export-service";
 import { useProposalCount } from "@/hooks/useProposals";
 import { useDarkMode } from "@/hooks/useDarkMode";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -42,6 +42,34 @@ function App() {
       if (!file) return;
       const text = await file.text();
       await importFromJson(text);
+      setShowMenu(false);
+    };
+    input.click();
+  }, []);
+
+  const handleRestoreMetadata = useCallback(async () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      try {
+        const result = await importMetadata(text);
+        const lines = [
+          `Members updated: ${result.membersUpdated}`,
+          `Calling notes applied: ${result.callingNotesApplied}`,
+          `Proposals created: ${result.proposalsCreated}`,
+        ];
+        if (result.warnings.length) {
+          lines.push("", `${result.warnings.length} warnings:`, ...result.warnings.slice(0, 10));
+          if (result.warnings.length > 10) lines.push(`...and ${result.warnings.length - 10} more`);
+        }
+        alert(lines.join("\n"));
+      } catch (e) {
+        alert(`Restore failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
       setShowMenu(false);
     };
     input.click();
@@ -156,6 +184,21 @@ function App() {
                     className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
                   >
                     Restore Backup
+                  </button>
+                  <div className="border-t my-1" />
+                  <button
+                    onClick={() => { downloadMetadataBackup(); setShowMenu(false); }}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                    title="Backup proposed changes, activity status, and notes"
+                  >
+                    Backup Metadata
+                  </button>
+                  <button
+                    onClick={handleRestoreMetadata}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                    title="Restore metadata on top of existing members and callings"
+                  >
+                    Restore Metadata
                   </button>
                   <div className="border-t my-1" />
                   <button
