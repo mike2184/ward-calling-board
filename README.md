@@ -9,12 +9,15 @@ A local-first web application for managing ward callings in The Church of Jesus 
 - **Kanban Board View** — Visual board with organization columns and calling cards showing fill status, serving duration, and proposed changes
 - **List View** — Traditional table view of all callings grouped by organization
 - **Drag-and-Drop** — Drag members onto vacant slots to propose assignments, or onto filled callings to propose replacements
-- **Proposed Changes Workflow** — Draft → Submit for Approval → Approve → Apply, with sustaining report generation
-- **Member Sidebar** — Filter members by age group (0-10, 11-17, 18+), gender (M/F), and sort by name or age
+- **Proposed Changes Workflow** — Draft → Submit for Approval → Approve → Apply, with sustaining report generation (group by type or by organization, print-ready)
+- **Notes on Proposed Callings** — Click the note icon on any proposed card to add context; hover to see the note in a tooltip
+- **Member Sidebar** — Filter members by age group (0-10, 11-17, 18+), gender (M/F), and activity status (active / less-active / inactive / serving-away / not-eligible); sort by name or age
+- **Hover Tooltips** — Hover a member name on any calling card to see their other current callings
+- **Gender Restrictions** — Positions can be marked men-only or women-only; drops are enforced and badges show the restriction
 - **Organization Filters** — Multi-select organization filter pills with vacancy count badges
 - **Dashboard** — Summary stats with fill rates, longest-serving members, and per-organization breakdowns
 - **Import from LCR** — Import members and callings from LCR PDF exports (see below)
-- **Export** — CSV export and full JSON backup/restore
+- **Export** — CSV export, full JSON backup/restore, and metadata-only backup/restore that survives a fresh LCR re-import
 - **Dark Mode** — System preference detection with manual toggle
 
 ## Getting Started
@@ -95,4 +98,11 @@ This imports all current callings and assignments, matching them to the members 
 
 ## Data Privacy
 
-All data is stored locally in your browser's IndexedDB. Nothing is sent to any server. You can back up your data at any time via **More** > **Backup Data** and restore it later with **More** > **Restore Backup**.
+All data is stored locally in your browser's IndexedDB. Nothing is sent to any server.
+
+## Backup & Restore
+
+Two backup options are available from the **More** menu:
+
+- **Backup Data / Restore Backup** — Full JSON snapshot of everything (members, organizations, positions, callings, proposals). Use this to move all data between browsers or take a point-in-time snapshot.
+- **Backup Metadata / Restore Metadata** — Exports only the app-managed fields: proposed changes, member activity status, member notes, and calling notes. Keyed by names rather than IDs, so you can re-import fresh LCR data and then restore your annotations on top. Restore is additive (it never deletes existing data) and reports any members or positions it couldn't match.

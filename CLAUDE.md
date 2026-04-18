@@ -20,11 +20,12 @@ src/
     db.ts                  — Dexie database schema and initialization
     seed.ts                — Default ward organizations and positions
     import-service.ts      — Import orchestration (callings + members)
-    export-service.ts      — CSV export, JSON backup/restore
+    export-service.ts      — CSV export, full JSON backup/restore, and metadata-only backup/restore (proposals + activity status + notes)
     import-parsers/
       lcr-json-parser.ts   — Parses LCR JSON from sub-orgs-with-callings endpoint
       csv-parser.ts        — Flexible CSV parser with column mapping
-      pdf-parser.ts        — LCR PDF text extraction and parsing (pdfjs-dist)
+      pdf-parser.ts        — LCR callings PDF text extraction and parsing (pdfjs-dist)
+      member-pdf-parser.ts — LCR members PDF parser ("Member List" / "Members without Callings")
   hooks/
     useCallings.ts         — Calling queries with org/position/member joins
     useMembers.ts          — Member queries (unassigned, multi-calling, etc.)
@@ -38,8 +39,9 @@ src/
     members/MemberSidebar.tsx — Sidebar showing unassigned/multi-calling members
     members/DraggableMemberCard.tsx — Draggable member card for board view
     filters/OrganizationFilter.tsx — Org filter pills + search + vacant toggle
-    import/ImportWizard.tsx — Multi-step import dialog (LCR JSON + CSV + PDF tabs)
-    changes/ProposedChangesList.tsx — Changes drawer with proposal cards and sustaining report
+    board/NotesButton.tsx  — Note icon + edit dialog + hover tooltip for proposed calling cards
+    import/ImportWizard.tsx — Multi-step import dialog (Members PDF, Callings PDF, LCR JSON, CSV tabs)
+    changes/ProposedChangesList.tsx — Changes drawer with proposal cards, notes display, and sustaining report
     dashboard/Dashboard.tsx — Summary stats modal with fill rates and longest serving
   utils/time.ts            — Serving duration formatting
   lib/utils.ts             — Tailwind merge utility (cn)
@@ -104,7 +106,20 @@ src/
 
 ### Phase 4 — Polish & Advanced Features ✅
 - LCR PDF import parser (pdfjs-dist text extraction with regex parsing)
+- Members PDF parser supporting both "Member List" and "Members without Callings" formats
 - Export to CSV
 - Dashboard summary stats (fill rates, longest serving, per-org breakdowns)
 - Data backup/restore (full JSON export/import)
 - Dark mode (system preference + manual toggle, localStorage persistence)
+
+### Phase 5 — Member Management & Sustaining Report ✅
+- Member activity status (active / less-active / inactive / serving-away / not-eligible) — app-managed, preserved across LCR re-imports
+- Member-level filters: age bucket, gender, activity status
+- Hover tooltip on member names showing their other current callings
+- Gender restrictions on positions (enforced on drop with dot badges)
+- Sustaining Report: group-by-type / group-by-organization toggle, print layout isolated to report content
+
+### Phase 6 — Notes & Metadata Backup ✅
+- Notes on proposed calling cards: icon in top-right of each proposed card opens an edit dialog; subtle when empty, primary-colored with hover tooltip when set. Stored in `ProposedChange.reason`
+- Metadata-only backup/restore: exports proposed changes, member activity status, member notes, and calling notes keyed by names (organization/position/member) rather than IDs, so the file survives a fresh LCR re-import. Restore is additive and reports warnings for unresolved references
+- Import Wizard tab order: Members PDF, Callings PDF, LCR JSON Paste, CSV Upload (Members PDF default)
