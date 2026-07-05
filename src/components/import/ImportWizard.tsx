@@ -231,8 +231,8 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
                     <ol className="list-decimal list-inside space-y-1">
                       <li>Log in to LCR in your browser</li>
                       <li>Navigate to <strong>Callings</strong> &rarr; <strong>Organizations and Callings</strong></li>
-                      <li>Enable <strong>Include member list</strong> in the print options</li>
-                      <li>Click <strong>Print</strong> to download the PDF, then upload it below</li>
+                      <li>Click <strong>Print</strong> &mdash; in the <strong>Print Options</strong> dialog, check both <strong>Callings</strong> and <strong>Members</strong></li>
+                      <li>Download the PDF, then upload it below</li>
                     </ol>
                     <p className="text-xs">Imports both callings and members from a single PDF. Organizations and positions are read directly from the PDF.</p>
                   </div>

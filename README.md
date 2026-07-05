@@ -53,33 +53,35 @@ The built files will be in the `dist/` directory. You can serve them with any st
 
 ## Importing Data from LCR
 
-The app supports importing member and calling data from PDF reports generated in [Leader and Clerk Resources (LCR)](https://lcr.churchofjesuschrist.org/).
+The app imports member and calling data from PDF reports generated in [Leader and Clerk Resources (LCR)](https://lcr.churchofjesuschrist.org/).
 
-### Step 1: Import All Members
+### Recommended: Import Everything from One PDF
 
-This imports every member in your ward with their name, gender, age, phone number, and email address.
-
-1. Log in to [LCR](https://lcr.churchofjesuschrist.org/)
-2. Navigate to **Membership** > **Member Directory**
-3. Click **Print** to download the PDF
-4. In the app, go to **More** > **Import Data**
-5. Select the **Members PDF** tab
-6. Upload the downloaded PDF and click **Preview**
-7. Verify the parsed data looks correct, then click **Import**
-
-### Step 2: Import Callings
-
-This imports all current callings and assignments, matching them to the members you already imported.
+LCR can produce a single **Organizations and Callings** PDF that includes the member list, so you no longer need two separate exports. This one file gives the app both your callings and your members.
 
 1. Log in to [LCR](https://lcr.churchofjesuschrist.org/)
-2. Navigate to **Callings** > **Callings by Organization**
-3. Click **Print** to download the PDF
-4. In the app, go to **More** > **Import Data**
-5. Select the **Callings PDF** tab
-6. Upload the downloaded PDF and click **Preview**
-7. Verify the parsed data looks correct, then click **Import**
+2. Navigate to **Callings** > **Organizations and Callings**
+3. Click **Print** — a **Print Options** dialog appears
+4. In the dialog, select your unit and check **both** **Callings** and **Members** (leave **Ministering** unchecked), then download the PDF
 
-> **Tip:** Import members first, then callings. The callings import will automatically match members by name. You can re-import at any time to update data — existing members will be updated with any new information rather than duplicated.
+   > This is the same report as the callings-only export; the Print Options dialog is simply where you add the member information to the same PDF.
+
+5. In the app, go to **More** > **Import Data**
+6. On the default **Ward PDF** tab, upload the downloaded PDF and click **Preview**
+7. Verify the parsed callings and members look correct, then click **Import**
+
+Organizations and positions are read directly from the PDF, so the board reflects your unit exactly — including any renamed classes. Re-import at any time to refresh; existing members are updated rather than duplicated.
+
+> **Tip:** For a clean slate, use **More** > **Reset Data** before importing. Your annotations (proposals, notes, activity status) can be preserved across a re-import via **Backup Metadata** / **Restore Metadata** (see below).
+
+### Alternative: Two Separate PDFs
+
+If you prefer to export callings and members separately, the app still supports it:
+
+- **Members PDF** tab — from **Membership** > **Member Directory**, click **Print**
+- **Callings PDF** tab — from **Callings** > **Organizations and Callings**, click **Print** (Callings only)
+
+Import members first, then callings, so the callings import can match members by name.
 
 ### Other Import Options
 
