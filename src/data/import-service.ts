@@ -1,9 +1,6 @@
 import { db } from "./db";
-import {
-  defaultOrganizations,
-  defaultPositions,
-  generateId,
-} from "./seed";
+import { defaultOrganizations, generateId } from "./seed";
+import { inferGenderFromOrg } from "./import-parsers/combined-pdf-parser";
 import type { ParsedCalling, ParsedMember } from "@/types/models";
 
 function normalizeOrgName(name: string): string {
@@ -65,12 +62,6 @@ export async function importCallings(
         }
       }
 
-      // Ensure default positions exist
-      const existingPositions = await db.callingPositions.toArray();
-      if (existingPositions.length === 0) {
-        await db.callingPositions.bulkAdd(defaultPositions);
-      }
-
       // Track existing members for matching
       const existingMembers = await db.members.toArray();
       const memberNameMap = new Map<string, string>();
@@ -127,6 +118,7 @@ export async function importCallings(
               sortOrder: maxOrder + 1,
               isRequired: false,
               maxHolders: 1,
+              genderRestriction: inferGenderFromOrg(parsed.organizationName),
             });
           }
 
@@ -271,22 +263,12 @@ export async function importMembers(
 }
 
 export async function seedDefaultData(): Promise<void> {
+  // Seed only the organization shells (in a sensible order). Positions and
+  // callings are defined entirely by the imported PDF — the PDF is the source
+  // of truth — so we intentionally do not pre-create any positions here.
   const orgCount = await db.organizations.count();
   if (orgCount === 0) {
     await db.organizations.bulkAdd(defaultOrganizations);
-    await db.callingPositions.bulkAdd(defaultPositions);
-
-    // Create vacant callings for all default positions
-    for (const pos of defaultPositions) {
-      await db.callings.add({
-        id: generateId(),
-        positionId: pos.id,
-        memberId: null,
-        activeDate: null,
-        setApart: false,
-        status: "vacant",
-      });
-    }
   }
 }
 
